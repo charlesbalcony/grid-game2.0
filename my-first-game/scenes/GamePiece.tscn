@@ -1,0 +1,30 @@
+[gd_scene load_steps=2 format=3 uid="uid://bx8y9dlcjpw3h"]
+
+[ext_resource type="Script" path="res://scripts/game_piece.gd" id="1_piece"]
+
+[node name="GamePiece" type="Node2D"]
+script = ExtResource("1_piece")
+
+[node name="PieceSprite" type="ColorRect" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -35.0
+offset_top = -35.0
+offset_right = 35.0
+offset_bottom = 35.0
+
+[node name="Border" type="ColorRect" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -37.0
+offset_top = -37.0
+offset_right = 37.0
+offset_bottom = 37.0
+color = Color(0, 0, 0, 1)
+z_index = -1
