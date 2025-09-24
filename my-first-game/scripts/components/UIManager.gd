@@ -10,6 +10,7 @@ const ATTACK_HIGHLIGHT_COLOR = Color(1.0, 0.3, 0.3, 0.6)
 
 var attack_ui = null
 var attack_highlights = []
+var game_over_overlay = null  # Store reference to game over screen
 
 var parent_node = null
 var grid_system = null
@@ -23,7 +24,7 @@ func set_parent_node(node: Node2D):
 
 func set_grid_system(grid):
 	"""Set reference to the grid system"""
-	pass
+	grid_system = grid
 
 func create_attack_ui():
 	"""Create the attack selection UI (initially hidden)"""
@@ -253,3 +254,75 @@ func update_turn_display(game_manager = null):
 		else:
 			player_indicator.modulate = Color(0.5, 0.5, 0.5)
 			enemy_indicator.modulate = Color.WHITE
+
+func show_game_over(winner: String, reason: String = "elimination"):
+	"""Show game over screen"""
+	if not parent_node:
+		return
+	
+	# Clear any existing game over screen
+	clear_game_over()
+	
+	# Create game over overlay
+	game_over_overlay = ColorRect.new()
+	game_over_overlay.color = Color(0, 0, 0, 0.8)
+	game_over_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_over_overlay.z_index = 10
+	
+	# Create game over panel
+	var panel = Panel.new()
+	panel.size = Vector2(400, 200)
+	panel.position = Vector2(200, 150)
+	panel.z_index = 11
+	
+	var vbox = VBoxContainer.new()
+	vbox.position = Vector2(20, 20)
+	vbox.size = Vector2(360, 160)
+	
+	# Title
+	var title = Label.new()
+	title.text = "GAME OVER!"
+	title.add_theme_font_size_override("font_size", 32)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+	
+	# Winner announcement
+	var winner_label = Label.new()
+	if winner.to_lower() == "player":
+		if reason == "king_death":
+			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated the enemy King!"
+		else:
+			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated all enemies!"
+		winner_label.modulate = Color.GREEN
+	else:
+		if reason == "king_death":
+			winner_label.text = "💀 DEFEAT 💀\nYour King has fallen!"
+		else:
+			winner_label.text = "💀 DEFEAT 💀\nAll your pieces were destroyed!"
+		winner_label.modulate = Color.RED
+	
+	winner_label.add_theme_font_size_override("font_size", 18)
+	winner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(winner_label)
+	
+	# Restart button
+	var restart_button = Button.new()
+	restart_button.text = "Play Again"
+	restart_button.size = Vector2(150, 40)
+	restart_button.pressed.connect(func(): 
+		clear_game_over()  # Clear the game over screen before reloading
+		get_tree().reload_current_scene()
+	)
+	vbox.add_child(restart_button)
+	
+	panel.add_child(vbox)
+	game_over_overlay.add_child(panel)
+	
+	# Add to scene
+	parent_node.get_parent().add_child(game_over_overlay)
+
+func clear_game_over():
+	"""Clear any existing game over screen"""
+	if game_over_overlay and is_instance_valid(game_over_overlay):
+		game_over_overlay.queue_free()
+		game_over_overlay = null

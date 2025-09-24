@@ -34,17 +34,21 @@ func use_action():
 		call_deferred("switch_turn")
 
 func switch_turn():
+	print("=== SWITCHING TURN from ", current_team, " ===")
 	actions_used = 0
 	
 	if current_team == "player":
 		current_team = "enemy"
 		current_state = GameState.ENEMY_TURN
 		turn_count += 1
+		print("Switched to ENEMY turn, turn count: ", turn_count)
 	else:
 		current_team = "player"
 		current_state = GameState.PLAYER_TURN
+		print("Switched to PLAYER turn, turn count: ", turn_count)
 	
 	print("Turn ", turn_count, ": ", current_team.capitalize(), "'s turn")
+	print("Emitting turn_changed signal with: ", current_team)
 	turn_changed.emit(current_team)
 
 func can_move_piece(team: String) -> bool:
@@ -53,10 +57,10 @@ func can_move_piece(team: String) -> bool:
 func can_perform_action(team: String) -> bool:
 	return current_team == team and current_state != GameState.GAME_OVER and actions_used < actions_per_turn
 
-func end_game(winner: String):
+func end_game(winner: String, reason: String = "elimination"):
 	current_state = GameState.GAME_OVER
-	game_over.emit(winner)
-	print("Game Over! Winner: ", winner.capitalize())
+	game_over.emit(winner, reason)
+	print("Game Over! Winner: ", winner.capitalize(), " (Reason: ", reason, ")")
 
 func get_current_team() -> String:
 	return current_team

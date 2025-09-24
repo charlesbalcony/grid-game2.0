@@ -7,7 +7,7 @@ extends Node2D
 @export var max_health: int = 100
 @export var current_health: int = 100
 @export var attack_power: int = 25
-@export var defense: int = 2
+@export var defense: int = 0
 @export var movement_range: int = 1
 
 var grid_position: Vector2
@@ -66,11 +66,17 @@ func create_health_bar():
 	team_indicator.add_theme_font_size_override("font_size", 10)
 	
 	if team == "player":
-		team_indicator.text = "P"
-		team_indicator.add_theme_color_override("font_color", Color(0.1, 0.5, 0.9))
+		if piece_type == "king":
+			team_indicator.text = "K"
+		else:
+			team_indicator.text = "P"
+		team_indicator.add_theme_color_override("font_color", Color.BLACK)
 	else:
-		team_indicator.text = "E"
-		team_indicator.add_theme_color_override("font_color", Color(0.9, 0.2, 0.1))
+		if piece_type == "king":
+			team_indicator.text = "K"
+		else:
+			team_indicator.text = "E"
+		team_indicator.add_theme_color_override("font_color", Color.BLACK)
 	
 	team_indicator.name = "TeamIndicator"
 	add_child(team_indicator)

@@ -30,15 +30,21 @@ func set_ui_manager(ui):
 
 func process_enemy_turn(game_manager):
 	"""Main AI function - processes one enemy action per turn"""
+	print("AI process_enemy_turn called. Game manager exists: ", game_manager != null)
+	if game_manager:
+		print("Current team: ", game_manager.get_current_team())
+	
 	if not game_manager or game_manager.get_current_team() != "enemy":
 		return
 		
 	if not piece_manager:
+		print("AI: No piece manager!")
 		return
 		
 	# Get all enemy pieces
 	var enemy_pieces = piece_manager.get_pieces_by_team("enemy")
 	if enemy_pieces.is_empty():
+		print("AI: No enemy pieces found!")
 		return
 		
 	print("AI has ", enemy_pieces.size(), " pieces available")
@@ -199,7 +205,7 @@ func perform_ai_attack(attacker_data: Dictionary, target_data: Dictionary, game_
 		"accuracy": get_attack_accuracy(attack_type)
 	}
 	
-	print("AI attacking with ", attack_type, " attack")
+	print("AI attacking with ", attack_type, " attack using ", attacker_data.get("piece_type", "piece"), " at ", attacker_data.position)
 	
 	# Perform the attack using positions (delegate to parent)
 	# The attack will use an action automatically
@@ -235,11 +241,11 @@ func get_attack_damage(attack_type: String) -> int:
 	"""Get base damage for an attack type"""
 	match attack_type:
 		"basic":
-			return 25
+			return 50
 		"heavy":
-			return 40
+			return 50
 		"quick":
-			return 15
+			return 50
 		_:
 			return 25
 

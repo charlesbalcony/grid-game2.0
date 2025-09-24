@@ -22,6 +22,7 @@ var turn_label = null
 var end_turn_button = null
 var player_indicator = null
 var enemy_indicator = null
+var ai_timer = null  # Store AI timer to cancel if needed
 
 func _ready():
 	# Initialize components
@@ -42,6 +43,7 @@ func _ready():
 	if game_manager:
 		game_manager.turn_changed.connect(_on_turn_changed)
 		game_manager.actions_used_up.connect(_on_actions_used_up)
+		game_manager.game_over.connect(_on_game_over)
 	if end_turn_button:
 		end_turn_button.pressed.connect(_on_end_turn_pressed)
 	
@@ -57,6 +59,7 @@ func initialize_components():
 	piece_manager = PieceManager.new()
 	piece_manager.set_parent_node(self)
 	piece_manager.set_grid_system(grid_system)
+	piece_manager.piece_died.connect(_on_piece_died)
 	add_child(piece_manager)
 	
 	input_handler = InputHandler.new()
@@ -67,6 +70,7 @@ func initialize_components():
 	
 	ui_manager = UIManager.new()
 	ui_manager.set_parent_node(self)
+	ui_manager.set_grid_system(grid_system)
 	add_child(ui_manager)
 	
 	# Wire ui_manager to input_handler
@@ -122,11 +126,11 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	var damage = 0
 	match attack_type.to_lower():
 		"basic":
-			damage = 25
+			damage = 50
 		"heavy":
-			damage = 40
+			damage = 50
 		"quick":
-			damage = 15
+			damage = 50
 	
 	# Apply damage
 	print("Target piece structure: ", target)
@@ -162,17 +166,51 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	input_handler.set_mode("MOVE")
 
 func check_win_condition():
-	var player_pieces = piece_manager.get_pieces_by_team(0)
-	var enemy_pieces = piece_manager.get_pieces_by_team(1)
+	var player_pieces = piece_manager.get_pieces_by_team("player")
+	var enemy_pieces = piece_manager.get_pieces_by_team("enemy")
+	
+	# Check for king deaths first - this is an immediate game over condition
+	var player_has_king = false
+	var enemy_has_king = false
+	
+	for piece_data in player_pieces:
+		if piece_data.piece_node.piece_type == "king":
+			player_has_king = true
+			break
+	
+	for piece_data in enemy_pieces:
+		if piece_data.piece_node.piece_type == "king":
+			enemy_has_king = true
+			break
+	
+	# King death = immediate game over
+	if not player_has_king:
+		print("Player's King has fallen! Enemy wins!")
+		game_manager.end_game("Enemy", "king_death")
+		return
+	elif not enemy_has_king:
+		print("Enemy's King has fallen! Player wins!")
+		game_manager.end_game("Player", "king_death")
+		return
+	
+	# Traditional win condition - all pieces destroyed
+	print("Win condition check: Player pieces: ", player_pieces.size(), ", Enemy pieces: ", enemy_pieces.size())
 	
 	if player_pieces.is_empty():
 		print("Enemy wins!")
-		game_manager.end_game("Enemy")
+		game_manager.end_game("Enemy", "elimination")
 	elif enemy_pieces.is_empty():
 		print("Player wins!")
-		game_manager.end_game("Player")
+		game_manager.end_game("Player", "elimination")
 
 func _on_turn_changed(player_index):
+	print("=== TURN CHANGED to: ", player_index, " ===")
+	
+	# Cancel any existing AI timer
+	if ai_timer:
+		print("Cancelling existing AI timer")
+		ai_timer = null
+	
 	# Update turn display
 	if turn_label:
 		if player_index == "player":
@@ -190,14 +228,36 @@ func _on_turn_changed(player_index):
 	
 	# Handle enemy turn
 	if player_index == "enemy":
+		print("Starting enemy turn with 1.5s delay...")
 		# AI turn with delay for better pacing
-		var timer = get_tree().create_timer(1.5)
-		timer.timeout.connect(func(): ai_system.process_enemy_turn(game_manager))
+		ai_timer = get_tree().create_timer(1.5)
+		ai_timer.timeout.connect(func(): 
+			print("Timer finished, calling AI...")
+			if ai_timer:  # Check if timer is still valid
+				ai_timer = null
+				ai_system.process_enemy_turn(game_manager)
+		)
 
 func _on_actions_used_up():
 	print("All actions used up for this turn")
 	# Turn switching is already handled by game_manager.use_action()
 	# Don't call force_end_turn() here to avoid double switching
+
+func _on_piece_died(piece):
+	"""Handle when any piece dies - check for game over"""
+	print("Piece died: ", piece.piece_type, " (", piece.team, ")")
+	check_win_condition()
+
+func _on_game_over(winner: String, reason: String = "elimination"):
+	"""Handle game over - show victory/defeat screen"""
+	print("GAME OVER! Winner: ", winner, " (Reason: ", reason, ")")
+	
+	# Stop AI processing
+	if ai_system:
+		ai_system.set_process(false)
+	
+	# Show game over UI
+	ui_manager.show_game_over(winner, reason)
 
 func _on_end_turn_pressed():
 	print("End turn button pressed")

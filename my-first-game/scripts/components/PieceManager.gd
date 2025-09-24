@@ -40,14 +40,22 @@ func setup_pieces():
 	# Setup enemy pieces (red) on rows 0 and 1 (top)
 	for row in range(2):
 		for col in range(8):  # Use literal instead of GridSystem.GRID_SIZE
-			create_piece(Vector2(col, row), ENEMY_COLOR, "enemy")
+			# Place King in center-back position (col 3, row 0)
+			if row == 0 and col == 3:
+				create_piece(Vector2(col, row), ENEMY_COLOR, "enemy", "king")
+			else:
+				create_piece(Vector2(col, row), ENEMY_COLOR, "enemy", "warrior")
 	
 	# Setup player pieces (blue) on rows 6 and 7 (bottom)
 	for row in range(6, 8):
 		for col in range(8):  # Use literal instead of GridSystem.GRID_SIZE
-			create_piece(Vector2(col, row), PLAYER_COLOR, "player")
+			# Place King in center-back position (col 3, row 7)
+			if row == 7 and col == 3:
+				create_piece(Vector2(col, row), PLAYER_COLOR, "player", "king")
+			else:
+				create_piece(Vector2(col, row), PLAYER_COLOR, "player", "warrior")
 
-func create_piece(grid_pos: Vector2, color: Color, team: String):
+func create_piece(grid_pos: Vector2, color: Color, team: String, piece_type: String = "warrior"):
 	"""Create a new piece at the specified position"""
 	if not parent_node or not grid_system:
 		return
@@ -58,8 +66,23 @@ func create_piece(grid_pos: Vector2, color: Color, team: String):
 	
 	# Set piece properties
 	piece_instance.team = team
+	piece_instance.piece_type = piece_type
 	piece_instance.position = grid_system.grid_to_world_pos(grid_pos) + Vector2(grid_system.TILE_SIZE/2, grid_system.TILE_SIZE/2)
 	piece_instance.set_grid_position(grid_pos)
+	
+	# Configure piece based on type
+	if piece_type == "king":
+		# Kings have different stats
+		piece_instance.max_health = 120
+		piece_instance.current_health = 120
+		piece_instance.attack_power = 35
+		piece_instance.defense = 10
+	else:
+		# Default warrior stats
+		piece_instance.max_health = 100
+		piece_instance.current_health = 100
+		piece_instance.attack_power = 25
+		piece_instance.defense = 0
 	
 	# Connect signals
 	piece_instance.piece_died.connect(_on_piece_died)
@@ -199,10 +222,11 @@ func can_piece_move_to(from_pos: Vector2, to_pos: Vector2) -> bool:
 	if not is_position_occupied(from_pos):
 		return false
 	
-	# For now, allow movement to any adjacent position
+	# For now, allow movement to adjacent positions including diagonals
 	# This can be enhanced with piece-specific movement rules
-	var distance = grid_system.get_manhattan_distance(from_pos, to_pos)
-	return distance == 1
+	var manhattan_distance = grid_system.get_manhattan_distance(from_pos, to_pos)
+	var euclidean_distance = grid_system.get_distance(from_pos, to_pos)
+	return manhattan_distance <= 2 and euclidean_distance <= 1.5
 
 func get_selected_piece():
 	"""Get the currently selected piece"""
