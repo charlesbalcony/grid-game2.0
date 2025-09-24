@@ -69,11 +69,21 @@ func initialize_components():
 	ui_manager.set_parent_node(self)
 	add_child(ui_manager)
 	
+	# Wire ui_manager to input_handler
+	input_handler.set_ui_manager(ui_manager)
+	
+	# Initialize attack UI
+	ui_manager.create_attack_ui()
+	
 	ai_system = GameBoardAI.new()
 	ai_system.set_parent_node(self)
 	ai_system.set_grid_system(grid_system)
 	ai_system.set_piece_manager(piece_manager)
 	add_child(ai_system)
+
+func get_selected_piece():
+	"""Get the currently selected piece from piece manager"""
+	return piece_manager.get_selected_piece() if piece_manager else null
 
 func setup_board():
 	# Create the grid
@@ -110,38 +120,38 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	
 	# Calculate damage based on attack type
 	var damage = 0
-	match attack_type:
-		"Basic":
-			damage = 1
-		"Heavy":
-			damage = 2
-		"Quick":
-			damage = 1
+	match attack_type.to_lower():
+		"basic":
+			damage = 25
+		"heavy":
+			damage = 40
+		"quick":
+			damage = 15
 	
 	# Apply damage
 	print("Target piece structure: ", target)
-	if target.has("hp"):
-		target.hp -= damage
-	elif target.has("HP"):
-		target.HP -= damage
+	if target.has("piece_node") and target.piece_node:
+		var piece_node = target.piece_node
+		if piece_node.has_method("take_damage"):
+			piece_node.take_damage(damage)
+		else:
+			print("Warning: piece_node doesn't have take_damage method")
 	else:
-		print("Warning: Could not find HP field in target piece")
+		print("Warning: Could not find piece_node in target piece")
 		return
 	
 	print("Attack: ", attacker_pos, " -> ", target_pos, " (", attack_type, ") for ", damage, " damage")
 	
-	# Create attack effect
-	ui_manager.create_attack_effect(grid_system.grid_to_world_pos(attacker_pos), 
-									 grid_system.grid_to_world_pos(target_pos))
+	# Show attack notification
+	var attacker_team = attacker.team if attacker else "unknown"
+	ui_manager.show_attack_notification(attacker_team, attack_type, damage, target_pos)
 	
-	# Check if target is defeated
-	var current_hp = target.hp if target.has("hp") else (target.HP if target.has("HP") else 0)
-	if current_hp <= 0:
-		print("Piece defeated at ", target_pos)
-		piece_manager.remove_piece_at(target_pos)
-		
-		# Check win condition
-		check_win_condition()
+	# Create attack effect
+	ui_manager.create_attack_effect(grid_system.grid_to_world_pos(target_pos))
+	
+	# Check if target is defeated - piece death is handled by the piece itself
+	# The piece will call die() which triggers _on_piece_died signal in PieceManager
+	# No need to manually remove pieces here
 	
 	# Use action
 	if game_manager:
@@ -180,13 +190,14 @@ func _on_turn_changed(player_index):
 	
 	# Handle enemy turn
 	if player_index == "enemy":
-		# AI turn with delay
-		ai_system.process_enemy_turn(game_manager)
+		# AI turn with delay for better pacing
+		var timer = get_tree().create_timer(1.5)
+		timer.timeout.connect(func(): ai_system.process_enemy_turn(game_manager))
 
 func _on_actions_used_up():
 	print("All actions used up for this turn")
-	if game_manager:
-		game_manager.force_end_turn()
+	# Turn switching is already handled by game_manager.use_action()
+	# Don't call force_end_turn() here to avoid double switching
 
 func _on_end_turn_pressed():
 	print("End turn button pressed")

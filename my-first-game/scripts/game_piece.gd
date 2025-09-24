@@ -7,7 +7,7 @@ extends Node2D
 @export var max_health: int = 100
 @export var current_health: int = 100
 @export var attack_power: int = 25
-@export var defense: int = 5
+@export var defense: int = 2
 @export var movement_range: int = 1
 
 var grid_position: Vector2

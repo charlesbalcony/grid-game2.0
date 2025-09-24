@@ -49,6 +49,7 @@ func _input(event):
 	"""Process input events"""
 	# Only allow input during player's turn
 	if game_manager and game_manager.current_team != "player":
+		print("Input blocked - current team: ", game_manager.current_team)
 		return
 		
 	if event is InputEventMouseButton and event.pressed:
@@ -86,15 +87,21 @@ func handle_right_click(world_pos: Vector2):
 	if not grid_system.is_valid_position(grid_pos):
 		return
 	
-	# Right click to enter attack mode if a piece is selected
-	var selected_piece = piece_manager.get_selected_piece()
-	var selected_position = piece_manager.get_selected_position()
-	
-	if selected_piece and piece_manager.is_position_occupied(grid_pos) and piece_manager.get_piece_at_position(grid_pos).team == selected_piece.team:
-		piece_manager.select_piece(grid_pos)
-		if ui_manager:
-			ui_manager.show_attack_options(selected_piece)
-		set_mode("ATTACK")
+	# Right click on a piece to show attack options
+	if piece_manager.is_position_occupied(grid_pos):
+		var piece = piece_manager.get_piece_at_position(grid_pos)
+		# Only allow right-clicking own pieces
+		if piece.team == "player":
+			piece_manager.select_piece(grid_pos)
+			if ui_manager:
+				ui_manager.show_attack_options(piece)
+			set_mode("ATTACK")
+		else:
+			print("Cannot attack with enemy pieces!")
+	else:
+		# Right click on empty space - cancel any attack mode
+		if current_mode == "ATTACK":
+			set_mode("MOVE")
 	
 	right_click_processed.emit(grid_pos)
 

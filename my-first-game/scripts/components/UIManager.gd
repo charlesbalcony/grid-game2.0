@@ -90,16 +90,35 @@ func hide_attack_ui():
 	if attack_ui:
 		attack_ui.visible = false
 	
-	# Emit signal to switch back to move mode
-	if parent_node and parent_node.has_method("set_mode"):
-		parent_node.set_mode("MOVE")
+	# Switch back to move mode through input handler
+	if parent_node and parent_node.input_handler and parent_node.input_handler.has_method("set_mode"):
+		parent_node.input_handler.set_mode("MOVE")
 
 func execute_attack(attack_data):
 	"""Execute an attack selection"""
-	if parent_node and parent_node.has_method("on_attack_selected"):
-		parent_node.on_attack_selected(attack_data)
-	
 	print("Attack selected: ", attack_data.name, " - Click target to attack")
+	
+	# Set the selected attack on the currently selected piece
+	if parent_node and parent_node.has_method("get_selected_piece"):
+		var selected_piece = parent_node.get_selected_piece()
+		if selected_piece:
+			# Set the attack type based on attack name
+			var attack_type = "basic"
+			if "Heavy" in attack_data.name:
+				attack_type = "Heavy"
+			elif "Quick" in attack_data.name:
+				attack_type = "Quick"
+			else:
+				attack_type = "Basic"
+			
+			selected_piece["selected_attack"] = attack_type
+			
+			# Hide the attack UI
+			hide_attack_ui()
+			
+			# Switch to attack mode - call method on parent's input handler
+			if parent_node.input_handler and parent_node.input_handler.has_method("set_mode"):
+				parent_node.input_handler.set_mode("ATTACK")
 
 func show_attack_targets(attacker_pos: Vector2, selected_piece):
 	"""Highlight valid attack targets"""
@@ -144,6 +163,11 @@ func clear_attack_highlights():
 			highlight.queue_free()
 	attack_highlights.clear()
 
+func clear_attack_ui():
+	"""Clear attack UI (alias for hide_attack_ui for compatibility)"""
+	hide_attack_ui()
+	clear_attack_highlights()
+
 func create_attack_effect(grid_pos: Vector2):
 	"""Create visual effect for attacks"""
 	if not grid_system or not parent_node:
@@ -160,6 +184,38 @@ func create_attack_effect(grid_pos: Vector2):
 	var tween = parent_node.create_tween()
 	tween.tween_property(effect, "modulate:a", 0.0, 0.3)
 	tween.tween_callback(effect.queue_free)
+
+func show_attack_notification(attacker_team: String, attack_type: String, damage: int, target_pos: Vector2):
+	"""Show a notification when an attack happens"""
+	if not parent_node:
+		return
+	
+	# Create attack notification text
+	var notification = Label.new()
+	var attack_name = attack_type.capitalize()
+	notification.text = attacker_team.capitalize() + " " + attack_name + " Attack!\n" + str(damage) + " damage"
+	notification.size = Vector2(200, 60)
+	
+	# Position near the target
+	if grid_system:
+		var world_pos = grid_system.grid_to_world_pos(target_pos)
+		notification.position = world_pos + Vector2(-50, -80)  # Above the target
+	else:
+		notification.position = Vector2(400, 100)  # Fallback position
+	
+	# Style the notification
+	notification.modulate = Color.YELLOW if attacker_team == "enemy" else Color.CYAN
+	notification.z_index = 5
+	notification.add_theme_font_size_override("font_size", 16)
+	
+	parent_node.add_child(notification)
+	
+	# Animate the notification
+	var tween = parent_node.create_tween()
+	tween.parallel().tween_property(notification, "position:y", notification.position.y - 30, 1.5)
+	# Fade out after 1.5 seconds
+	tween.parallel().tween_property(notification, "modulate:a", 0.0, 2.0).set_delay(1.0)
+	tween.tween_callback(notification.queue_free)
 
 func update_ui_info(text: String):
 	"""Update the UI info text"""

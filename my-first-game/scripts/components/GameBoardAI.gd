@@ -41,30 +41,58 @@ func process_enemy_turn(game_manager):
 	if enemy_pieces.is_empty():
 		return
 		
-	# Try to find an attack opportunity first
-	for piece_data in enemy_pieces:
-		var attack_targets = get_adjacent_enemies(piece_data.position, "enemy")
-		if not attack_targets.is_empty():
-			# Found an attack opportunity
-			perform_ai_attack(piece_data, attack_targets[0], game_manager)
-			return
+	print("AI has ", enemy_pieces.size(), " pieces available")
 	
-	# No attacks available, try to move towards player pieces
-	var best_move = find_best_move(enemy_pieces)
-	if best_move:
-		perform_ai_move(best_move.piece, best_move.target_pos, game_manager)
+	# Add some AI personality - 70% chance to attack when possible, 30% chance to move instead
+	var should_prioritize_attack = randf() < 0.7
+	
+	if should_prioritize_attack:
+		# Try to find attack opportunities and add variety
+		var attack_options = []
+		for piece_data in enemy_pieces:
+			var attack_targets = get_adjacent_enemies(piece_data.position, "enemy")
+			for target in attack_targets:
+				attack_options.append({"attacker": piece_data, "target": target})
+		
+		if not attack_options.is_empty():
+			# Pick a random attack from available options
+			var selected_attack = attack_options[randi() % attack_options.size()]
+			perform_ai_attack(selected_attack.attacker, selected_attack.target, game_manager)
+			return
+		
+		# No attacks available, try to move towards player pieces
+		var best_move = find_best_move(enemy_pieces)
+		if best_move:
+			perform_ai_move(best_move.piece, best_move.target_pos, game_manager)
+	else:
+		# Sometimes prefer moving even when attacks are available
+		var best_move = find_best_move(enemy_pieces)
+		if best_move:
+			perform_ai_move(best_move.piece, best_move.target_pos, game_manager)
+			return
+		
+		# If no moves available, fall back to attacking with variety
+		var attack_options = []
+		for piece_data in enemy_pieces:
+			var attack_targets = get_adjacent_enemies(piece_data.position, "enemy")
+			for target in attack_targets:
+				attack_options.append({"attacker": piece_data, "target": target})
+		
+		if not attack_options.is_empty():
+			var selected_attack = attack_options[randi() % attack_options.size()]
+			perform_ai_attack(selected_attack.attacker, selected_attack.target, game_manager)
 
 func find_best_move(enemy_pieces: Array) -> Dictionary:
-	"""Find the best move for AI - move towards closest player piece"""
+	"""Find the best move for AI with some randomness for variety"""
 	if not piece_manager or not grid_system:
 		return {}
 		
 	var player_pieces = piece_manager.get_pieces_by_team("player")
 	if player_pieces.is_empty():
 		return {}
-		
-	var best_move = {}
-	var best_distance = 999.0
+	
+	# Collect all possible moves with their scores
+	var possible_moves = []
 	
 	for enemy_piece in enemy_pieces:
 		for player_piece in player_pieces:
@@ -72,14 +100,41 @@ func find_best_move(enemy_pieces: Array) -> Dictionary:
 			
 			# Try to move towards this player piece
 			var target_pos = get_move_towards(enemy_piece.position, player_piece.position)
-			if target_pos != Vector2(-1, -1) and distance < best_distance:
-				best_distance = distance
-				best_move = {
+			if target_pos != Vector2(-1, -1):
+				# Score based on distance (lower is better, so invert)
+				var score = 10.0 - distance
+				
+				possible_moves.append({
 					"piece": enemy_piece,
-					"target_pos": target_pos
-				}
+					"target_pos": target_pos,
+					"score": score
+				})
 	
-	return best_move
+	if possible_moves.is_empty():
+		return {}
+	
+	# Sort moves by score (best first)
+	possible_moves.sort_custom(func(a, b): return a.score > b.score)
+	
+	# Add variety: 60% chance to pick the best move, 30% for top 3, 10% for any move
+	var rand_val = randf()
+	var selected_move
+	
+	if rand_val < 0.6:
+		# Pick the best move
+		selected_move = possible_moves[0]
+	elif rand_val < 0.9 and possible_moves.size() >= 3:
+		# Pick from top 3 moves
+		var top_moves = possible_moves.slice(0, min(3, possible_moves.size()))
+		selected_move = top_moves[randi() % top_moves.size()]
+	else:
+		# Pick any random move
+		selected_move = possible_moves[randi() % possible_moves.size()]
+	
+	return {
+		"piece": selected_move.piece,
+		"target_pos": selected_move.target_pos
+	}
 
 func get_move_towards(from_pos: Vector2, to_pos: Vector2) -> Vector2:
 	"""Find a valid adjacent position that moves towards the target"""
@@ -116,7 +171,7 @@ func perform_ai_move(piece_data: Dictionary, target_pos: Vector2, game_manager):
 	"""Execute an AI move"""
 	if not game_manager or not game_manager.can_perform_action("enemy"):
 		return
-	
+		
 	if not piece_manager:
 		return
 		
@@ -124,9 +179,7 @@ func perform_ai_move(piece_data: Dictionary, target_pos: Vector2, game_manager):
 	
 	# Update piece position using piece manager
 	if piece_manager.move_piece(old_pos, target_pos):
-		print("AI moved piece from ", old_pos, " to ", target_pos)
-		
-		# Use action
+		print("AI moved ", piece_data.get("piece_type", "piece"), " from ", old_pos, " to ", target_pos)		# Use action
 		game_manager.use_action()
 
 func perform_ai_attack(attacker_data: Dictionary, target_data: Dictionary, game_manager):
@@ -149,6 +202,7 @@ func perform_ai_attack(attacker_data: Dictionary, target_data: Dictionary, game_
 	print("AI attacking with ", attack_type, " attack")
 	
 	# Perform the attack using positions (delegate to parent)
+	# The attack will use an action automatically
 	if parent_node and parent_node.has_method("perform_attack"):
 		parent_node.perform_attack(attacker_data.position, target_data.position, attack_type)
 

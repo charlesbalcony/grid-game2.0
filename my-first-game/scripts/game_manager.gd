@@ -44,8 +44,8 @@ func switch_turn():
 		current_team = "player"
 		current_state = GameState.PLAYER_TURN
 	
-	turn_changed.emit(current_team)
 	print("Turn ", turn_count, ": ", current_team.capitalize(), "'s turn")
+	turn_changed.emit(current_team)
 
 func can_move_piece(team: String) -> bool:
 	return current_team == team and current_state != GameState.GAME_OVER
