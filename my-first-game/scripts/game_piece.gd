@@ -32,10 +32,14 @@ func _ready():
 func setup_appearance():
 	# Set initial appearance based on team
 	var sprite = $PieceSprite
+	var border = $Border
+	
 	if team == "player":
-		sprite.color = Color(0.2, 0.6, 1.0)  # Blue
+		sprite.color = Color(0.1, 0.5, 0.9)  # Bright blue
+		border.color = Color(0.0, 0.2, 0.6)  # Dark blue border
 	else:
-		sprite.color = Color(1.0, 0.3, 0.2)  # Red
+		sprite.color = Color(0.9, 0.2, 0.1)  # Bright red
+		border.color = Color(0.6, 0.0, 0.0)  # Dark red border
 
 func create_health_bar():
 	# Create a health bar above the piece
@@ -52,6 +56,24 @@ func create_health_bar():
 	health_bar.color = Color(0.0, 0.8, 0.0)
 	health_bar.name = "HealthBar"
 	add_child(health_bar)
+	
+	# Add team indicator
+	var team_indicator = Label.new()
+	team_indicator.position = Vector2(-15, -65)
+	team_indicator.size = Vector2(30, 15)
+	team_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	team_indicator.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	team_indicator.add_theme_font_size_override("font_size", 10)
+	
+	if team == "player":
+		team_indicator.text = "P"
+		team_indicator.add_theme_color_override("font_color", Color(0.1, 0.5, 0.9))
+	else:
+		team_indicator.text = "E"
+		team_indicator.add_theme_color_override("font_color", Color(0.9, 0.2, 0.1))
+	
+	team_indicator.name = "TeamIndicator"
+	add_child(team_indicator)
 	
 	update_health_bar()
 
@@ -75,7 +97,8 @@ func set_grid_position(pos: Vector2):
 func set_selected(selected: bool):
 	is_selected = selected
 	if selected:
-		$PieceSprite.color = $PieceSprite.color.lightened(0.3)
+		$PieceSprite.color = $PieceSprite.color.lightened(0.4)
+		$Border.color = Color.WHITE  # White border when selected
 	else:
 		setup_appearance()
 
