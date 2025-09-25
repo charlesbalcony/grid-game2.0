@@ -70,6 +70,8 @@ func handle_left_click(world_pos: Vector2):
 	if not grid_system.is_valid_position(grid_pos):
 		return
 	
+	print("Left click at ", grid_pos, " in mode: ", current_mode)
+	
 	if current_mode == "MOVE":
 		handle_move_click(grid_pos)
 	elif current_mode == "ATTACK":
@@ -87,6 +89,8 @@ func handle_right_click(world_pos: Vector2):
 	if not grid_system.is_valid_position(grid_pos):
 		return
 	
+	print("Right click at ", grid_pos, " in mode: ", current_mode)
+	
 	# Right click on a piece to show attack options
 	if piece_manager.is_position_occupied(grid_pos):
 		var piece = piece_manager.get_piece_at_position(grid_pos)
@@ -96,11 +100,13 @@ func handle_right_click(world_pos: Vector2):
 			if ui_manager:
 				ui_manager.show_attack_options(piece)
 			set_mode("ATTACK")
+			print("Setting attack mode for piece at ", grid_pos)
 		else:
 			print("Cannot attack with enemy pieces!")
 	else:
 		# Right click on empty space - cancel any attack mode
 		if current_mode == "ATTACK":
+			print("Canceling attack mode - clicked empty space")
 			set_mode("MOVE")
 	
 	right_click_processed.emit(grid_pos)
@@ -188,6 +194,7 @@ func handle_attack_click(grid_pos: Vector2):
 func set_mode(new_mode: String):
 	"""Set the current input mode"""
 	if current_mode != new_mode:
+		print("Mode changed from ", current_mode, " to ", new_mode)
 		current_mode = new_mode
 		
 		if ui_manager:

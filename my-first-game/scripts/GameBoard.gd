@@ -8,6 +8,8 @@ const PieceManager = preload("res://scripts/components/PieceManager.gd")
 const InputHandler = preload("res://scripts/components/InputHandler.gd")
 const UIManager = preload("res://scripts/components/UIManager.gd")
 const GameBoardAI = preload("res://scripts/components/GameBoardAI.gd")
+const ArmyManager = preload("res://scripts/systems/ArmyManager.gd")
+const Army = preload("res://scripts/systems/Army.gd")
 
 # Component references
 var grid_system
@@ -15,6 +17,7 @@ var piece_manager
 var input_handler
 var ui_manager
 var ai_system
+var army_manager
 
 # Game state
 var game_manager = null
@@ -84,10 +87,22 @@ func initialize_components():
 	ai_system.set_grid_system(grid_system)
 	ai_system.set_piece_manager(piece_manager)
 	add_child(ai_system)
+	
+	# Initialize army manager
+	army_manager = ArmyManager.new()
+	army_manager.army_changed.connect(_on_army_changed)
+	army_manager.level_completed.connect(_on_level_completed)
+	add_child(army_manager)
 
 func get_selected_piece():
 	"""Get the currently selected piece from piece manager"""
-	return piece_manager.get_selected_piece() if piece_manager else null
+	if piece_manager:
+		return piece_manager.selected_piece
+	return null
+
+func get_army_manager():
+	"""Get the army manager instance"""
+	return army_manager
 
 func setup_board():
 	# Create the grid
@@ -122,15 +137,18 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	if not attacker or not target:
 		return
 	
-	# Calculate damage based on attack type
+	# Calculate damage based on attack type and attacker's stats
 	var damage = 0
-	match attack_type.to_lower():
-		"basic":
-			damage = 50
-		"heavy":
-			damage = 50
-		"quick":
-			damage = 50
+	if attacker.has("piece_node") and attacker.piece_node:
+		var attacker_piece = attacker.piece_node
+		# Look up the damage for the specific attack type
+		for attack in attacker_piece.available_attacks:
+			if attack.name.to_lower().contains(attack_type.to_lower()) or attack_type.to_lower().contains(attack.name.to_lower().split(" ")[0]):
+				damage = attack.damage
+				break
+		# Fallback to basic attack power if no specific attack found
+		if damage == 0:
+			damage = attacker_piece.attack_power
 	
 	# Apply damage
 	print("Target piece structure: ", target)
@@ -256,6 +274,9 @@ func _on_game_over(winner: String, reason: String = "elimination"):
 	if ai_system:
 		ai_system.set_process(false)
 	
+	# Don't advance army here - wait for player to click restart
+	# The army advancement will happen in restart_battle() when appropriate
+	
 	# Show game over UI
 	ui_manager.show_game_over(winner, reason)
 
@@ -263,3 +284,39 @@ func _on_end_turn_pressed():
 	print("End turn button pressed")
 	if game_manager:
 		game_manager.force_end_turn()
+
+func _on_army_changed(new_army: Army):
+	"""Handle when the army changes (new level starts)"""
+	print("New army deployed: ", new_army.army_name, " (Level ", new_army.level, ")")
+	print("Army stats: HP x", new_army.health_multiplier, ", DMG x", new_army.damage_multiplier, ", DEF +", new_army.defense_bonus)
+
+func _on_level_completed(completed_army: Army):
+	"""Handle when a level is completed"""
+	print("Level completed! Defeated: ", completed_army.army_name)
+
+func restart_battle(winner: String = ""):
+	"""Restart the battle while preserving army progression"""
+	
+	# Handle army progression based on winner
+	if winner.to_lower() == "player" and army_manager:
+		army_manager.advance_to_next_army()
+		print("Player won - Advanced to next army level")
+	elif winner.to_lower() != "player" and army_manager:
+		army_manager.reset_to_first_army()
+		print("Player defeated - Army reset to Level 1")
+	
+	print("Restarting battle with current army: ", army_manager.get_current_army().army_name)
+	
+	# Clear existing pieces
+	piece_manager.clear_all_pieces()
+	
+	# Restart game manager
+	if game_manager:
+		game_manager.restart_game()
+	
+	# Re-setup pieces with current army stats
+	piece_manager.setup_pieces()
+	
+	# Re-enable AI processing
+	if ai_system:
+		ai_system.set_process(true)

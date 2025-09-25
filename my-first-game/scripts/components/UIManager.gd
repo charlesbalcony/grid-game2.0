@@ -113,12 +113,14 @@ func execute_attack(attack_data):
 				attack_type = "Basic"
 			
 			selected_piece["selected_attack"] = attack_type
+			print("Set selected_attack to: ", attack_type, " on piece")
 			
 			# Hide the attack UI
 			hide_attack_ui()
 			
 			# Switch to attack mode - call method on parent's input handler
 			if parent_node.input_handler and parent_node.input_handler.has_method("set_mode"):
+				print("Setting attack mode after selecting attack type")
 				parent_node.input_handler.set_mode("ATTACK")
 
 func show_attack_targets(attacker_pos: Vector2, selected_piece):
@@ -263,6 +265,16 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	# Clear any existing game over screen
 	clear_game_over()
 	
+	# Get current army info if available
+	var army_info = ""
+	var game_board = parent_node
+	if game_board and game_board.has_method("get_army_manager"):
+		var army_manager = game_board.get_army_manager()
+		if army_manager:
+			var current_army = army_manager.get_current_army()
+			if current_army:
+				army_info = "\nLevel " + str(current_army.level) + ": " + current_army.army_name
+	
 	# Create game over overlay
 	game_over_overlay = ColorRect.new()
 	game_over_overlay.color = Color(0, 0, 0, 0.8)
@@ -290,15 +302,15 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	var winner_label = Label.new()
 	if winner.to_lower() == "player":
 		if reason == "king_death":
-			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated the enemy King!"
+			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated the enemy King!" + army_info + "\n\nNext: Harder enemies await!"
 		else:
-			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated all enemies!"
+			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated all enemies!" + army_info + "\n\nNext: Harder enemies await!"
 		winner_label.modulate = Color.GREEN
 	else:
 		if reason == "king_death":
-			winner_label.text = "💀 DEFEAT 💀\nYour King has fallen!"
+			winner_label.text = "💀 DEFEAT 💀\nYour King has fallen!" + army_info
 		else:
-			winner_label.text = "💀 DEFEAT 💀\nAll your pieces were destroyed!"
+			winner_label.text = "💀 DEFEAT 💀\nAll your pieces were destroyed!" + army_info
 		winner_label.modulate = Color.RED
 	
 	winner_label.add_theme_font_size_override("font_size", 18)
@@ -307,11 +319,16 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	
 	# Restart button
 	var restart_button = Button.new()
-	restart_button.text = "Play Again"
+	# Set button text based on winner
+	if winner.to_lower() == "player":
+		restart_button.text = "Continue"  # Advancing to next army level
+	else:
+		restart_button.text = "Play Again"  # Restarting at level 1
 	restart_button.size = Vector2(150, 40)
+	var game_winner = winner  # Capture winner in local scope
 	restart_button.pressed.connect(func(): 
-		clear_game_over()  # Clear the game over screen before reloading
-		get_tree().reload_current_scene()
+		clear_game_over()  # Clear the game over screen
+		restart_battle(game_winner)   # Pass winner info for army reset decision
 	)
 	vbox.add_child(restart_button)
 	
@@ -326,3 +343,11 @@ func clear_game_over():
 	if game_over_overlay and is_instance_valid(game_over_overlay):
 		game_over_overlay.queue_free()
 		game_over_overlay = null
+
+func restart_battle(winner: String = ""):
+	"""Restart the battle while preserving army progression"""
+	if parent_node and parent_node.has_method("restart_battle"):
+		parent_node.restart_battle(winner)
+	else:
+		# Fallback to scene reload if restart_battle doesn't exist
+		get_tree().reload_current_scene()

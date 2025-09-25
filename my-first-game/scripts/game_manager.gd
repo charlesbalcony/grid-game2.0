@@ -79,3 +79,12 @@ func get_game_info() -> String:
 
 func force_end_turn():
 	switch_turn()
+
+func restart_game():
+	"""Restart the game state for a new battle"""
+	current_team = "player"
+	current_state = GameState.PLAYER_TURN
+	actions_used = 0
+	turn_count = 1
+	print("Game restarted - Turn 1: Player's turn")
+	turn_changed.emit(current_team)

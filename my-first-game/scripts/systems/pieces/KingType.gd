@@ -31,7 +31,7 @@ func create_royal_strike() -> AttackData:
 func create_commanding_blow() -> AttackData:
 	var attack = AttackData.new()
 	attack.name = "Commanding Blow"
-	attack.damage = 50
+	attack.damage = 45
 	attack.range = 1
 	attack.accuracy = 0.7
 	attack.description = "Powerful royal attack"

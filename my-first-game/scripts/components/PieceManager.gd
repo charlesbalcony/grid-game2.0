@@ -84,6 +84,10 @@ func create_piece(grid_pos: Vector2, color: Color, team: String, piece_type: Str
 		piece_instance.attack_power = 25
 		piece_instance.defense = 0
 	
+	# Apply army modifiers for enemy pieces
+	if team == "enemy":
+		apply_army_modifiers(piece_instance)
+	
 	# Connect signals
 	piece_instance.piece_died.connect(_on_piece_died)
 	piece_instance.piece_damaged.connect(_on_piece_damaged)
@@ -250,3 +254,34 @@ func _on_piece_died(piece):
 func _on_piece_damaged(piece, damage):
 	"""Handle when a piece takes damage"""
 	print("Damage dealt: ", damage)
+
+func apply_army_modifiers(piece_instance):
+	"""Apply current army modifiers to enemy pieces"""
+	# Get current army from parent GameBoard
+	var game_board = parent_node
+	if game_board and game_board.has_method("get_army_manager"):
+		var army_manager = game_board.get_army_manager()
+		if army_manager:
+			var current_army = army_manager.get_current_army()
+			if current_army:
+				# Apply health multiplier
+				piece_instance.max_health = int(piece_instance.max_health * current_army.health_multiplier)
+				piece_instance.current_health = piece_instance.max_health
+				
+				# Apply damage multiplier
+				piece_instance.attack_power = int(piece_instance.attack_power * current_army.damage_multiplier)
+				
+				# Apply defense bonus
+				piece_instance.defense += current_army.defense_bonus
+				
+				print("Applied army modifiers to ", piece_instance.piece_type, ": HP=", piece_instance.max_health, ", ATK=", piece_instance.attack_power, ", DEF=", piece_instance.defense)
+
+func clear_all_pieces():
+	"""Clear all pieces from the board"""
+	for piece_data in pieces.values():
+		if piece_data.piece_node and is_instance_valid(piece_data.piece_node):
+			piece_data.piece_node.queue_free()
+	
+	pieces.clear()
+	clear_selection()
+	print("All pieces cleared from board")
