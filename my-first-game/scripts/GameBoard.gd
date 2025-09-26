@@ -140,7 +140,7 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	if not attacker or not target:
 		return
 	
-	# Calculate damage based on attack type and attacker's stats
+	# Calculate base damage based on attack type and attacker's stats
 	var damage = 0
 	if attacker.has("piece_node") and attacker.piece_node:
 		var attacker_piece = attacker.piece_node
@@ -152,6 +152,16 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 		# Fallback to basic attack power if no specific attack found
 		if damage == 0:
 			damage = attacker_piece.attack_power
+	
+	# Calculate flanking bonus
+	var flanking_multiplier = 1.0
+	var surrounding_allies = count_surrounding_allies(target_pos, attacker.team)
+	if surrounding_allies > 0:
+		flanking_multiplier = 1.0 + (surrounding_allies * 0.25)
+		print("FLANKING BONUS: ", surrounding_allies, " allies surrounding target! Damage x", flanking_multiplier)
+	
+	# Apply flanking multiplier
+	damage = int(damage * flanking_multiplier)
 	
 	# Apply damage
 	print("Target piece structure: ", target)
@@ -165,7 +175,8 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 		print("Warning: Could not find piece_node in target piece")
 		return
 	
-	print("Attack: ", attacker_pos, " -> ", target_pos, " (", attack_type, ") for ", damage, " damage")
+	print("Attack: ", attacker_pos, " -> ", target_pos, " (", attack_type, ") for ", damage, " damage", 
+		  " (flanking x%.1f)" % flanking_multiplier if flanking_multiplier > 1.0 else "")
 	
 	# Show attack notification
 	var attacker_team = attacker.team if attacker else "unknown"
@@ -182,9 +193,29 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	if game_manager:
 		game_manager.use_action()
 	
-	# Clear UI state
+	# Clear UI state  
 	ui_manager.clear_attack_ui()
 	input_handler.set_mode("MOVE")
+
+func count_surrounding_allies(target_pos: Vector2, attacker_team: String) -> int:
+	"""Count how many allies of the attacker are adjacent to the target"""
+	var surrounding_count = 0
+	var directions = [
+		Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0),  # Cardinal directions
+		Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)  # Diagonal directions
+	]
+	
+	for direction in directions:
+		var check_pos = target_pos + direction
+		
+		# Check if there's a piece at this position
+		var piece_data = piece_manager.get_piece_at_position(check_pos)
+		if piece_data and piece_data.has("piece_node"):
+			# If it's an ally of the attacker, count it
+			if piece_data.piece_node.team == attacker_team:
+				surrounding_count += 1
+	
+	return surrounding_count
 
 func check_win_condition():
 	var player_pieces = piece_manager.get_pieces_by_team("player")

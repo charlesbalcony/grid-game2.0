@@ -16,7 +16,30 @@ func set_board_reference(board_node):
 	"""Set reference to the game board for accessing pieces and effects"""
 	board_reference = board_node
 
-func execute_attack(attacker_pos: Vector2, target_pos: Vector2, attack_data: AttackData) -> Dictionary:
+func count_surrounding_enemies(target_pos: Vector2, attacker_team: String, piece_manager = null) -> int:
+	"""Count how many allies of the attacker are adjacent to the target"""
+	if not piece_manager:
+		return 0
+	
+	var surrounding_count = 0
+	var directions = [
+		Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0),  # Cardinal directions
+		Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)  # Diagonal directions
+	]
+	
+	for direction in directions:
+		var check_pos = target_pos + direction
+		
+		# Check if there's a piece at this position
+		var piece_data = piece_manager.get_piece_at_position(check_pos)
+		if piece_data and piece_data.has("piece_node"):
+			# If it's an ally of the attacker, count it
+			if piece_data.piece_node.team == attacker_team:
+				surrounding_count += 1
+	
+	return surrounding_count
+
+func attack_at_positions(attacker_pos: Vector2, target_pos: Vector2, attack_data: AttackData) -> Dictionary:
 	"""Execute an attack and return the results"""
 	if not board_reference:
 		print("Combat system has no board reference!")
@@ -32,8 +55,8 @@ func execute_attack(attacker_pos: Vector2, target_pos: Vector2, attack_data: Att
 	var attacker = attacker_data.piece_node
 	var target = target_data.piece_node
 	
-	# Calculate attack result
-	var attack_result = calculate_attack_result(attacker, target, attack_data)
+	# Calculate attack result with flanking bonuses
+	var attack_result = calculate_attack_result(attacker, target, attack_data, attacker_pos, target_pos)
 	
 	# Apply damage/effects
 	apply_attack_effects(attacker, target, attack_data, attack_result)
@@ -46,24 +69,56 @@ func execute_attack(attacker_pos: Vector2, target_pos: Vector2, attack_data: Att
 	
 	return attack_result
 
-func calculate_attack_result(attacker, target, attack_data: AttackData) -> Dictionary:
-	"""Calculate the result of an attack"""
+func calculate_attack_result(attacker, target, attack_type_or_data, attacker_pos: Vector2, target_pos: Vector2, piece_manager = null):
+	"""Calculate the result of an attack with flanking bonuses"""
 	var result = {
 		"success": true,
 		"hit": true,
 		"damage": 0,
 		"critical": false,
 		"status_effects": [],
-		"target_eliminated": false
+		"target_eliminated": false,
+		"flanking_bonus": 0
 	}
 	
+	# Find attack data based on attack type string or use provided attack data
+	var attack_data = null
+	if typeof(attack_type_or_data) == TYPE_STRING:
+		var attack_type = attack_type_or_data
+		# Look up attack in attacker's available attacks
+		for attack in attacker.available_attacks:
+			if attack.name.to_lower().contains(attack_type.to_lower()) or attack_type.to_lower().contains(attack.name.to_lower().split(" ")[0]):
+				attack_data = attack
+				break
+		# Fallback to basic attack if not found
+		if not attack_data:
+			attack_data = {"name": "Basic Attack", "damage": attacker.attack_power, "accuracy": 0.95}
+	else:
+		attack_data = attack_type_or_data
+	
 	# Check if attack hits (based on accuracy)
-	if randf() > attack_data.accuracy:
+	var accuracy = attack_data.get("accuracy", 0.95)
+	if randf() > accuracy:
 		result.hit = false
 		return result
 	
-	# Calculate damage
-	var base_damage = attack_data.get_effective_damage(attacker.attack_power, target.defense)
+	# Calculate base damage
+	var base_damage = attack_data.get("damage", attacker.attack_power)
+	# Apply target defense
+	base_damage = max(1, base_damage - target.defense)
+	
+	# Calculate flanking bonus if positions are provided
+	var flanking_multiplier = 1.0
+	if target_pos != Vector2.ZERO and piece_manager:
+		var surrounding_enemies = count_surrounding_enemies(target_pos, attacker.team, piece_manager)
+		if surrounding_enemies > 0:
+			# 25% damage bonus per surrounding ally (up to 100% bonus for 4+ allies)
+			flanking_multiplier = 1.0 + (surrounding_enemies * 0.25)
+			result.flanking_bonus = surrounding_enemies
+			print("Flanking attack! ", surrounding_enemies, " allies surrounding target. Damage multiplier: ", flanking_multiplier)
+	
+	# Apply flanking multiplier to damage
+	base_damage = int(base_damage * flanking_multiplier)
 	
 	# Check for critical hit (5% chance for now)
 	if randf() < 0.05:
@@ -231,6 +286,8 @@ func log_attack(attacker, target, attack_data: AttackData, attack_result: Dictio
 		var damage_text = str(attack_result.damage)
 		if attack_result.critical:
 			damage_text += " (CRITICAL!)"
+		if attack_result.get("flanking_bonus", 0) > 0:
+			damage_text += " (FLANKING x" + str(attack_result.flanking_bonus) + "!)"
 		
 		print(attacker.piece_type, " attacks ", target.piece_type, " with ", attack_data.name, " for ", damage_text, " damage")
 		
