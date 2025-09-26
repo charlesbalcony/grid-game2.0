@@ -47,11 +47,16 @@ func process_enemy_turn(game_manager):
 		print("AI: No enemy pieces found!")
 		return
 		
-	print("AI has ", enemy_pieces.size(), " pieces available")
-	
-	# Enhanced AI decision making - balance immediate attacks with strategic positioning
+	# Get player pieces for aggression detection
+	var player_pieces = piece_manager.get_pieces_by_team("player")
+		
+	# Enhanced AI decision making - detect player aggression and respond accordingly
 	var immediate_king_attacks = []
 	var regular_attacks = []
+	
+	# DETECT PLAYER AGGRESSION - is player rushing our king?
+	var player_aggression_level = detect_player_aggression(enemy_pieces, player_pieces)
+	print("AI detected player aggression level: ", player_aggression_level)
 	
 	# First, check for any immediate attack opportunities
 	for piece_data in enemy_pieces:
@@ -71,13 +76,35 @@ func process_enemy_turn(game_manager):
 		perform_ai_attack(selected_attack.attacker, selected_attack.target, game_manager)
 		return
 	
-	# PRIORITY 2: Check if we can set up a king attack next turn
+	# PRIORITY 2: If player is being aggressive, respond with counter-aggression
+	if player_aggression_level >= 3:  # High aggression detected
+		print("AI responding to player aggression with counter-attack!")
+		
+		# Switch to aggressive mode - 80% attack/king rush, 20% positioning
+		var should_counter_attack = randf() < 0.8
+		
+		if should_counter_attack:
+			# Prioritize any attack available, even on regular pieces
+			if not regular_attacks.is_empty():
+				var selected_attack = regular_attacks[randi() % regular_attacks.size()]
+				print("AI making aggressive counter-attack!")
+				perform_ai_attack(selected_attack.attacker, selected_attack.target, game_manager)
+				return
+		
+		# If no attacks available, rush toward player king aggressively
+		var aggressive_move = find_most_aggressive_move(enemy_pieces)
+		if aggressive_move:
+			print("AI making aggressive rush toward player king!")
+			perform_ai_move(aggressive_move.piece, aggressive_move.target_pos, game_manager)
+			return
+	
+	# PRIORITY 3: Check if we can set up a king attack next turn
 	var can_setup_king_attack = false
 	if piece_manager:
-		var player_pieces = piece_manager.get_pieces_by_team("player")
+		var player_pieces_check = piece_manager.get_pieces_by_team("player")
 		var player_king = null
 		
-		for player_piece in player_pieces:
+		for player_piece in player_pieces_check:
 			if player_piece.piece_node.piece_type == "king":
 				player_king = player_piece
 				break
@@ -92,10 +119,14 @@ func process_enemy_turn(game_manager):
 				if can_setup_king_attack:
 					break
 	
-	# Adjust strategy based on situation
+	# Adjust strategy based on situation and player aggression
 	var should_prioritize_attack
-	if can_setup_king_attack:
-		# If we can set up a king attack, focus on positioning (70% move, 30% attack)
+	if player_aggression_level >= 2:  # Medium+ aggression
+		# More aggressive response - 70% attack focus
+		should_prioritize_attack = randf() < 0.7
+		print("AI adopting aggressive stance due to player pressure")
+	elif can_setup_king_attack:
+		# If we can set up a king attack, focus on positioning (30% attack, 70% move)
 		should_prioritize_attack = randf() < 0.3
 		print("AI can set up king attack - prioritizing positioning")
 	elif not regular_attacks.is_empty():
@@ -348,29 +379,119 @@ func find_best_move(enemy_pieces: Array) -> Dictionary:
 		"target_pos": selected_move.target_pos
 	}
 
-func evaluate_king_safety(king_pos: Vector2, enemy_pieces: Array, player_pieces: Array) -> float:
-	"""Evaluate how safe the king position is"""
-	var safety_score = 0.0
+func detect_player_aggression(enemy_pieces: Array, player_pieces: Array) -> int:
+	"""Detect how aggressively the player is targeting our king"""
+	var aggression_score = 0
 	
-	# Count nearby allies (good for protection)
-	var ally_protection = 0
-	for ally in enemy_pieces:
-		var distance = king_pos.distance_to(ally.position)
-		if distance <= 2.0 and ally.piece_node.piece_type != "king":
-			ally_protection += 1
-			safety_score += 15.0
+	# Find our king
+	var our_king = null
+	for enemy_piece in enemy_pieces:
+		if enemy_piece.piece_node.piece_type == "king":
+			our_king = enemy_piece
+			break
 	
-	# Count nearby enemies (bad - immediate threats)
-	var immediate_threats = 0
-	for enemy in player_pieces:
-		var distance = king_pos.distance_to(enemy.position)
-		if distance <= 2.0:
-			immediate_threats += 1
-			safety_score -= 25.0  # Heavy penalty for enemy proximity
-		if distance <= 1.5:  # Adjacent threat
-			safety_score -= 50.0  # Severe penalty for adjacent enemies
+	if not our_king:
+		return 0
 	
-	return safety_score
+	var king_pos = our_king.position
+	var threats_nearby = 0
+	var advancing_pieces = 0
+	
+	# Count player pieces threatening our king
+	for player_piece in player_pieces:
+		var distance_to_king = player_piece.position.distance_to(king_pos)
+		
+		# Immediate threats (very close)
+		if distance_to_king <= 2.0:
+			threats_nearby += 1
+			aggression_score += 2
+		elif distance_to_king <= 3.0:
+			threats_nearby += 1
+			aggression_score += 1
+		
+		# Check if player pieces are in our territory (advanced positions)
+		# Assuming enemy king is in upper area (low Y values)
+		if player_piece.position.y <= 3:  # Player pieces in enemy territory
+			advancing_pieces += 1
+			aggression_score += 1
+	
+	# Bonus aggression points for concentrated attacks
+	if threats_nearby >= 3:
+		aggression_score += 3  # Multiple pieces threatening king
+	if advancing_pieces >= 2:
+		aggression_score += 2  # Multiple pieces advancing
+	
+	print("King threats: ", threats_nearby, ", Advancing pieces: ", advancing_pieces, ", Total aggression: ", aggression_score)
+	return aggression_score
+
+func find_most_aggressive_move(enemy_pieces: Array) -> Dictionary:
+	"""Find the most aggressive move - prioritizing king rush over defensive play"""
+	if not piece_manager or not grid_system:
+		return {}
+		
+	var player_pieces = piece_manager.get_pieces_by_team("player")
+	if player_pieces.is_empty():
+		return {}
+	
+	# Find player king for aggressive targeting
+	var player_king = null
+	for player_piece in player_pieces:
+		if player_piece.piece_node.piece_type == "king":
+			player_king = player_piece
+			break
+	
+	if not player_king:
+		return {}
+	
+	var aggressive_moves = []
+	
+	# Focus only on non-king pieces for the rush
+	for enemy_piece in enemy_pieces:
+		if enemy_piece.piece_node.piece_type == "king":
+			continue  # Kings stay back even during aggressive play
+			
+		var valid_moves = get_valid_moves_for_piece(enemy_piece.position)
+		
+		for move_pos in valid_moves:
+			var aggression_score = 0.0
+			
+			# MAXIMUM priority for getting closer to player king
+			var current_distance = enemy_piece.position.distance_to(player_king.position)
+			var new_distance = move_pos.distance_to(player_king.position)
+			
+			if new_distance < current_distance:
+				aggression_score += (current_distance - new_distance) * 100.0  # Huge bonus
+			
+			# Extra bonus for getting very close to player king
+			if new_distance <= 2.0:
+				aggression_score += 200.0
+			if new_distance <= 1.5:
+				aggression_score += 500.0  # Almost adjacent to player king
+			
+			# Bonus for advancing toward player territory
+			if move_pos.y > enemy_piece.position.y:  # Moving toward player side
+				aggression_score += 50.0
+			
+			# Small penalty for sideways movement during aggression
+			if move_pos.y == enemy_piece.position.y:
+				aggression_score -= 20.0
+			
+			aggressive_moves.append({
+				"piece": enemy_piece,
+				"target_pos": move_pos,
+				"score": aggression_score
+			})
+	
+	if aggressive_moves.is_empty():
+		return {}
+	
+	# Sort by most aggressive and pick the best
+	aggressive_moves.sort_custom(func(a, b): return a.score > b.score)
+	
+	return {
+		"piece": aggressive_moves[0].piece,
+		"target_pos": aggressive_moves[0].target_pos
+	}
 
 func get_valid_moves_for_piece(piece_pos: Vector2) -> Array:
 	"""Get all valid moves for a piece at the given position"""

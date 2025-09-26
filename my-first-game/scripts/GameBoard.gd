@@ -82,11 +82,14 @@ func initialize_components():
 	# Initialize attack UI
 	ui_manager.create_attack_ui()
 	
-	ai_system = GameBoardAI.new()
+	# Load and initialize AI system
+	var ai_script = load("res://scripts/components/GameBoardAI.gd")
+	ai_system = ai_script.new()
 	ai_system.set_parent_node(self)
 	ai_system.set_grid_system(grid_system)
 	ai_system.set_piece_manager(piece_manager)
 	add_child(ai_system)
+	print("AI system initialized: ", ai_system)
 	
 	# Initialize army manager
 	army_manager = ArmyManager.new()
@@ -251,9 +254,17 @@ func _on_turn_changed(player_index):
 		ai_timer = get_tree().create_timer(1.5)
 		ai_timer.timeout.connect(func(): 
 			print("Timer finished, calling AI...")
+			print("AI system status: ", ai_system)
+			print("AI system is valid: ", is_instance_valid(ai_system))
 			if ai_timer:  # Check if timer is still valid
 				ai_timer = null
-				ai_system.process_enemy_turn(game_manager)
+				if ai_system and is_instance_valid(ai_system):  # Check if AI system exists and is valid
+					ai_system.process_enemy_turn(game_manager)
+				else:
+					print("ERROR: AI system is null or invalid! Skipping AI turn.")
+					# End turn to prevent getting stuck
+					if game_manager:
+						game_manager.force_end_turn()
 		)
 
 func _on_actions_used_up():
@@ -318,5 +329,7 @@ func restart_battle(winner: String = ""):
 	piece_manager.setup_pieces()
 	
 	# Re-enable AI processing
-	if ai_system:
+	if ai_system and is_instance_valid(ai_system):
 		ai_system.set_process(true)
+	else:
+		print("WARNING: AI system missing during restart!")
