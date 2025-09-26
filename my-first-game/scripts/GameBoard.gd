@@ -82,20 +82,28 @@ func initialize_components():
 	# Initialize attack UI
 	ui_manager.create_attack_ui()
 	
-	# Load and initialize AI system
-	var ai_script = load("res://scripts/components/GameBoardAI.gd")
+	# Initialize army manager first
+	army_manager = ArmyManager.new()
+	army_manager.army_changed.connect(_on_army_changed)
+	army_manager.level_completed.connect(_on_level_completed)
+	add_child(army_manager)
+	
+	# Initialize AI system (piece_manager was already created in initialize_components)
+	var ai_script = GameBoardAI
 	ai_system = ai_script.new()
 	ai_system.set_parent_node(self)
 	ai_system.set_grid_system(grid_system)
 	ai_system.set_piece_manager(piece_manager)
 	add_child(ai_system)
-	print("AI system initialized: ", ai_system)
 	
-	# Initialize army manager
-	army_manager = ArmyManager.new()
-	army_manager.army_changed.connect(_on_army_changed)
-	army_manager.level_completed.connect(_on_level_completed)
-	add_child(army_manager)
+	# Set AI difficulty based on army level
+	var army_level = army_manager.get_current_level()
+	if army_level == 1:
+		ai_system.set_difficulty_mode("easy")
+	else:
+		ai_system.set_difficulty_mode("medium")
+	
+	print("AI system initialized: ", ai_system)
 
 func get_selected_piece():
 	"""Get the currently selected piece from piece manager"""
@@ -340,6 +348,7 @@ func restart_battle(winner: String = ""):
 	"""Restart the battle while preserving army progression"""
 	
 	# Handle army progression based on winner
+	var old_level = army_manager.get_current_level() if army_manager else 1
 	if winner.to_lower() == "player" and army_manager:
 		army_manager.advance_to_next_army()
 		print("Player won - Advanced to next army level")
@@ -347,7 +356,15 @@ func restart_battle(winner: String = ""):
 		army_manager.reset_to_first_army()
 		print("Player defeated - Army reset to Level 1")
 	
+	var new_level = army_manager.get_current_level() if army_manager else 1
 	print("Restarting battle with current army: ", army_manager.get_current_army().army_name)
+	
+	# Update AI difficulty if army level changed
+	if old_level != new_level and ai_system:
+		if new_level == 1:
+			ai_system.set_difficulty_mode("easy")
+		else:
+			ai_system.set_difficulty_mode("medium")
 	
 	# Clear existing pieces
 	piece_manager.clear_all_pieces()

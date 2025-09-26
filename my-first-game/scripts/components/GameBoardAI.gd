@@ -8,9 +8,15 @@ var parent_node = null
 var grid_system = null
 var piece_manager = null
 var ui_manager = null
+var difficulty_mode = "medium"  # "easy" or "medium"
 
 func _init():
 	pass
+
+func set_difficulty_mode(mode: String):
+	"""Set AI difficulty mode - 'easy' or 'medium'"""
+	difficulty_mode = mode
+	print("AI difficulty set to: ", difficulty_mode)
 
 func set_parent_node(node: Node2D):
 	"""Set reference to the parent node"""
@@ -162,6 +168,13 @@ func find_best_move(enemy_pieces: Array) -> Dictionary:
 	var player_pieces = piece_manager.get_pieces_by_team("player")
 	if player_pieces.is_empty():
 		return {}
+	
+	# Simple easy mode - just attack closest piece or move forward
+	if difficulty_mode == "easy":
+		print("AI using EASY mode - simple behavior")
+		return find_easy_move(enemy_pieces, player_pieces)
+	
+	print("AI using MEDIUM mode - advanced tactics")
 	
 	# Find both kings for strategic considerations
 	var player_king = null
@@ -650,3 +663,49 @@ func get_attack_name(attack_type: String) -> String:
 			return "Quick Jab"
 		_:
 			return "Basic Attack"
+
+func find_easy_move(enemy_pieces: Array, player_pieces: Array) -> Dictionary:
+	"""Simple AI for easy mode - just move toward closest player piece"""
+	var possible_moves = []
+	
+	for enemy_piece in enemy_pieces:
+		var valid_moves = get_valid_moves_for_piece(enemy_piece.position)
+		
+		for move_pos in valid_moves:
+			var score = 0.0
+			
+			# Find closest player piece
+			var closest_distance = 999.0
+			for player_piece in player_pieces:
+				var distance = move_pos.distance_to(player_piece.position)
+				if distance < closest_distance:
+					closest_distance = distance
+			
+			# Simple scoring: closer to player = better
+			score = 100.0 - closest_distance
+			
+			# Small bonus for moving forward (toward player)
+			if move_pos.y > enemy_piece.position.y:
+				score += 10.0
+			
+			possible_moves.append({
+				"piece": enemy_piece,
+				"position": move_pos,
+				"score": score,
+				"type": "simple_move"
+			})
+	
+	if possible_moves.is_empty():
+		return {}
+	
+	# Sort by score and pick the best
+	possible_moves.sort_custom(func(a, b): return a.score > b.score)
+	var best_move = possible_moves[0]
+	
+	print("Easy AI selected move: ", best_move.piece.position, " -> ", best_move.position, " (score: ", best_move.score, ")")
+	
+	return {
+		"piece": best_move.piece,
+		"target_pos": best_move.position,  # Use target_pos to match existing AI interface
+		"move_type": best_move.type
+	}
