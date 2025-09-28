@@ -12,6 +12,10 @@ var game_manager = null
 
 var current_mode = "MOVE"  # "MOVE" or "ATTACK"
 
+# Debug mode for testing
+var debug_mode = false
+var god_mode = false
+
 # Drag state tracking
 var is_dragging = false
 var drag_start_pos = Vector2.ZERO
@@ -44,6 +48,15 @@ func set_ui_manager(ui):
 func set_game_manager(gm):
 	"""Set reference to the game manager"""
 	game_manager = gm
+
+func set_debug_mode(enabled: bool):
+	"""Enable debug/god mode for testing"""
+	debug_mode = enabled
+	god_mode = enabled
+	if enabled:
+		print("InputHandler: God mode ENABLED - instant kills from any distance!")
+	else:
+		print("InputHandler: Debug mode disabled")
 
 func _ready():
 	if parent_node:
@@ -206,6 +219,16 @@ func handle_right_click(world_pos: Vector2):
 	
 	print("Right click at ", grid_pos, " in mode: ", current_mode)
 	
+	# God mode: Right-click enemy to instantly kill
+	if god_mode and piece_manager.is_position_occupied(grid_pos):
+		var piece = piece_manager.get_piece_at_position(grid_pos)
+		if piece and piece.has("team") and piece.team == "enemy":
+			print("GOD MODE: Instantly killing enemy at ", grid_pos)
+			# Deal massive damage to instantly kill
+			if piece.has("piece_node") and is_instance_valid(piece.piece_node):
+				piece.piece_node.take_damage(9999)  # Instant kill
+			return
+	
 	# Right click on a piece to show attack options
 	if piece_manager.is_position_occupied(grid_pos):
 		var piece = piece_manager.get_piece_at_position(grid_pos)
@@ -294,28 +317,38 @@ func handle_attack_click(grid_pos: Vector2):
 	if piece_manager.is_position_occupied(grid_pos):
 		var target = piece_manager.get_piece_at_position(grid_pos)
 		if target.team != selected_piece.team:
-			# Check if target is adjacent (including diagonals)
-			if grid_system:
-				var distance = grid_system.get_manhattan_distance(grid_pos, selected_position)
-				var euclidean_distance = grid_system.get_distance(grid_pos, selected_position)
+			var can_attack = false
+			
+			# God mode: can attack from any distance
+			if god_mode:
+				can_attack = true
+				print("GOD MODE: Attacking from any distance!")
+			else:
+				# Normal mode: Check if target is adjacent (including diagonals)
+				if grid_system:
+					var distance = grid_system.get_manhattan_distance(grid_pos, selected_position)
+					var euclidean_distance = grid_system.get_distance(grid_pos, selected_position)
+					
+					# Allow both adjacent and diagonal attacks
+					if distance <= 2 and euclidean_distance <= 1.5:  # Adjacent or diagonal
+						can_attack = true
+			
+			if can_attack:
+				# Check if we can use an action
+				if game_manager and not game_manager.can_perform_action("player"):
+					print("No actions left this turn!")
+					return
 				
-				# Allow both adjacent and diagonal attacks
-				if distance <= 2 and euclidean_distance <= 1.5:  # Adjacent or diagonal
-					# Check if we can use an action
-					if game_manager and not game_manager.can_perform_action("player"):
-						print("No actions left this turn!")
-						return
-					
-					# Emit signal for attack processing (handled by main game board)
-					if parent_node and parent_node.has_method("perform_attack"):
-						parent_node.perform_attack(selected_position, grid_pos, selected_piece.selected_attack)
-					
-					# Action usage is handled by perform_attack() in GameBoard
-					
-					piece_manager.clear_selection()
-					set_mode("MOVE")
-				else:
-					print("Target too far away!")
+				# Emit signal for attack processing (handled by main game board)
+				if parent_node and parent_node.has_method("perform_attack"):
+					parent_node.perform_attack(selected_position, grid_pos, selected_piece.selected_attack)
+				
+				# Action usage is handled by perform_attack() in GameBoard
+				
+				piece_manager.clear_selection()
+				set_mode("MOVE")
+			else:
+				print("Target too far away!")
 		else:
 			print("Cannot attack friendly units!")
 	else:

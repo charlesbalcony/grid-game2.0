@@ -104,6 +104,13 @@ func calculate_attack_result(attacker, target, attack_type_or_data, attacker_pos
 	
 	# Calculate base damage
 	var base_damage = attack_data.get("damage", attacker.attack_power)
+	
+	# If this is a special attack (has its own damage), scale it by attacker's attack power
+	if attack_data.has("damage"):
+		# Scale the attack damage by the ratio of current attack power to base attack power (25)
+		var attack_power_ratio = float(attacker.attack_power) / 25.0  # 25 is the base warrior attack power
+		base_damage = int(attack_data.damage * attack_power_ratio)
+		print("Scaled attack damage: ", attack_data.damage, " * ", attack_power_ratio, " = ", base_damage)
 	# Apply target defense
 	base_damage = max(1, base_damage - target.defense)
 	

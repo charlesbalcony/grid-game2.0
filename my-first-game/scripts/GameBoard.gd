@@ -11,6 +11,13 @@ const GameBoardAI = preload("res://scripts/components/GameBoardAI.gd")
 const ArmyManager = preload("res://scripts/systems/ArmyManager.gd")
 const Army = preload("res://scripts/systems/Army.gd")
 
+# Debug mode for testing
+var debug_mode = false
+var god_mode = false
+
+# Prevent recursive restarts
+var is_restarting = false
+
 # Component references
 var grid_system
 var piece_manager
@@ -28,6 +35,15 @@ var enemy_indicator = null
 var ai_timer = null  # Store AI timer to cancel if needed
 
 func _ready():
+	# Check for debug mode from command line arguments
+	var args = OS.get_cmdline_args()
+	for arg in args:
+		if arg == "--debug" or arg == "--god-mode":
+			debug_mode = true
+			god_mode = true
+			print("DEBUG MODE ENABLED: God mode activated!")
+			break
+	
 	# Initialize components
 	initialize_components()
 	
@@ -69,6 +85,9 @@ func initialize_components():
 	input_handler.set_parent_node(self)
 	input_handler.set_grid_system(grid_system)
 	input_handler.set_piece_manager(piece_manager)
+	# Set debug mode if enabled
+	if debug_mode:
+		input_handler.set_debug_mode(god_mode)
 	add_child(input_handler)
 	
 	ui_manager = UIManager.new()
@@ -156,6 +175,11 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 		for attack in attacker_piece.available_attacks:
 			if attack.name.to_lower().contains(attack_type.to_lower()) or attack_type.to_lower().contains(attack.name.to_lower().split(" ")[0]):
 				damage = attack.damage
+				
+				# Scale the attack damage by the attacker's attack power ratio
+				var attack_power_ratio = float(attacker_piece.attack_power) / 25.0  # 25 is base warrior attack power
+				damage = int(damage * attack_power_ratio)
+				print("Scaled attack damage: ", attack.damage, " * ", attack_power_ratio, " = ", damage)
 				break
 		# Fallback to basic attack power if no specific attack found
 		if damage == 0:
@@ -347,6 +371,14 @@ func _on_level_completed(completed_army: Army):
 func restart_battle(winner: String = ""):
 	"""Restart the battle while preserving army progression"""
 	
+	# Prevent recursive calls
+	if is_restarting:
+		print("WARNING: restart_battle called while already restarting - ignoring")
+		return
+	is_restarting = true
+	
+	print("Starting battle restart process...")
+	
 	# Handle army progression based on winner
 	var old_level = army_manager.get_current_level() if army_manager else 1
 	if winner.to_lower() == "player" and army_manager:
@@ -367,13 +399,19 @@ func restart_battle(winner: String = ""):
 			ai_system.set_difficulty_mode("medium")
 	
 	# Clear existing pieces
+	print("Clearing pieces...")
 	piece_manager.clear_all_pieces()
 	
+	# Wait a frame for cleanup
+	await get_tree().process_frame
+	
 	# Restart game manager
+	print("Restarting game manager...")
 	if game_manager:
 		game_manager.restart_game()
 	
 	# Re-setup pieces with current army stats
+	print("Setting up new pieces...")
 	piece_manager.setup_pieces()
 	
 	# Re-enable AI processing
@@ -381,3 +419,6 @@ func restart_battle(winner: String = ""):
 		ai_system.set_process(true)
 	else:
 		print("WARNING: AI system missing during restart!")
+	
+	print("Battle restart complete!")
+	is_restarting = false
