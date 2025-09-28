@@ -11,6 +11,7 @@ const GameBoardAI = preload("res://scripts/components/GameBoardAI.gd")
 const ArmyManager = preload("res://scripts/systems/ArmyManager.gd")
 const Army = preload("res://scripts/systems/Army.gd")
 const HighScoreManager = preload("res://scripts/systems/HighScoreManager.gd")
+const GlyphManager = preload("res://scripts/systems/GlyphManager.gd")
 
 # Debug mode for testing
 var debug_mode = false
@@ -27,6 +28,7 @@ var ui_manager
 var ai_system
 var army_manager
 var high_score_manager
+var glyph_manager
 
 # Game state
 var game_manager = null
@@ -35,6 +37,7 @@ var end_turn_button = null
 var player_indicator = null
 var enemy_indicator = null
 var high_score_label = null
+var glyph_label = null
 var ai_timer = null  # Store AI timer to cancel if needed
 
 func _ready():
@@ -57,6 +60,14 @@ func _ready():
 	# Connect to high score updates
 	high_score_manager.high_score_updated.connect(_on_high_score_updated)
 	
+	# Initialize glyph manager
+	glyph_manager = GlyphManager.new()
+	add_child(glyph_manager)
+	
+	# Connect to glyph updates
+	glyph_manager.glyphs_changed.connect(_on_glyphs_changed)
+	glyph_manager.glyph_reward.connect(_on_glyph_reward)
+	
 	# Get references to game manager and UI elements  
 	game_manager = get_node("GameManager")
 	turn_label = get_node("UI/TurnDisplay/TurnLabel")
@@ -71,12 +82,28 @@ func _ready():
 		# Create high score display dynamically
 		create_high_score_display()
 	
+	# Try to get glyph label, create if doesn't exist
+	if has_node("UI/GlyphDisplay"):
+		glyph_label = get_node("UI/GlyphDisplay")
+	else:
+		# Create glyph display dynamically
+		if ui_manager:
+			ui_manager.create_glyph_display()
+	
 	# Now that game_manager is available, set it in the input handler
 	if input_handler and game_manager:
 		input_handler.set_game_manager(game_manager)
 	
 	# Update high score display
 	update_high_score_display()
+	
+	# Wait a frame for UI elements to be fully initialized, then update glyph display
+	await get_tree().process_frame
+	if ui_manager and glyph_manager:
+		var current_glyphs = glyph_manager.get_current_glyphs()
+		var stuck_glyphs = glyph_manager.get_stuck_glyphs()
+		var stuck_level = glyph_manager.get_stuck_at_level()
+		ui_manager.update_glyph_display(current_glyphs, stuck_glyphs, stuck_level)
 	
 	# Connect signals
 	if game_manager:
@@ -120,6 +147,9 @@ func initialize_components():
 	
 	# Initialize attack UI
 	ui_manager.create_attack_ui()
+	
+	# Initialize glyph display UI
+	ui_manager.create_glyph_display()
 	
 	# Initialize army manager first
 	army_manager = ArmyManager.new()
@@ -356,8 +386,25 @@ func _on_actions_used_up():
 	# Don't call force_end_turn() here to avoid double switching
 
 func _on_piece_died(piece):
-	"""Handle when any piece dies - check for game over"""
+	"""Handle when any piece dies - check for game over and award glyphs"""
 	print("Piece died: ", piece.piece_type, " (", piece.team, ")")
+	
+	# Award glyphs for destroying enemy pieces
+	if piece.team == "enemy" and glyph_manager:
+		# Get the piece's grid position for the reward notification
+		var grid_pos = Vector2.ZERO
+		if piece.has_method("get_grid_position"):
+			grid_pos = piece.get_grid_position()
+		elif "grid_pos" in piece:
+			grid_pos = piece.grid_pos
+		
+		if piece.piece_type == "king":
+			var glyphs = glyph_manager.award_king_glyph(grid_pos)
+			print("KING BONUS: +", glyphs, " glyphs!")
+		else:
+			var glyphs = glyph_manager.award_enemy_glyph(grid_pos)
+			print("Enemy destroyed: +", glyphs, " glyphs")
+	
 	check_win_condition()
 
 func _on_game_over(winner: String, reason: String = "elimination"):
@@ -411,6 +458,11 @@ func restart_battle(winner: String = ""):
 			high_score_manager.update_current_level(new_level)
 			high_score_manager.increment_battles_won()
 		
+		# Check for glyph recovery when advancing
+		if glyph_manager:
+			var completed_level = old_level  # The level we just completed
+			glyph_manager.check_glyph_recovery(completed_level)
+		
 	elif winner.to_lower() != "player" and army_manager:
 		army_manager.reset_to_first_army()
 		print("Player defeated - Army reset to Level 1")
@@ -419,6 +471,10 @@ func restart_battle(winner: String = ""):
 		if high_score_manager:
 			high_score_manager.reset_current_level()
 			high_score_manager.increment_games_played()
+		
+		# Lose glyphs when defeated
+		if glyph_manager:
+			glyph_manager.lose_glyphs(old_level)
 	
 	var new_level = army_manager.get_current_level() if army_manager else 1
 	print("Restarting battle with current army: ", army_manager.get_current_army().army_name)
@@ -492,3 +548,17 @@ func _on_high_score_updated(new_high_score: int):
 	"""Handle high score updates"""
 	print("NEW HIGH SCORE ACHIEVED: Level ", new_high_score)
 	update_high_score_display()
+
+func _on_glyphs_changed(current_glyphs: int, stuck_glyphs: int, stuck_level: int):
+	"""Handle glyph count updates"""
+	print("Glyphs updated: Current=", current_glyphs, " Stuck=", stuck_glyphs, " at Level=", stuck_level)
+	if ui_manager:
+		# Wait a frame to ensure UI elements are ready
+		await get_tree().process_frame
+		ui_manager.update_glyph_display(current_glyphs, stuck_glyphs, stuck_level)
+
+func _on_glyph_reward(glyph_count: int, enemy_type: String, grid_pos: Vector2):
+	"""Handle glyph reward notifications"""
+	print("Glyph reward: +", glyph_count, " glyphs for defeating ", enemy_type)
+	if ui_manager:
+		ui_manager.show_glyph_reward_notification(glyph_count, enemy_type, grid_pos)

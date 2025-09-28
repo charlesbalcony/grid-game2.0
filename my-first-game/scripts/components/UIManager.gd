@@ -13,6 +13,7 @@ var attack_highlights = []
 var drag_highlights = []  # Store references to drag highlight ColorRects
 var hover_highlights = []  # Store references to hover target highlights
 var game_over_overlay = null  # Store reference to game over screen
+var glyph_display = null  # Store reference to glyph display UI
 
 var parent_node = null
 var grid_system = null
@@ -57,6 +58,99 @@ func create_attack_ui():
 		ui_node.call_deferred("add_child", attack_ui)
 	else:
 		parent_node.get_parent().call_deferred("add_child", attack_ui)
+
+func create_glyph_display():
+	"""Create the glyph display UI"""
+	print("UIManager.create_glyph_display called")
+	
+	if not parent_node:
+		print("ERROR: parent_node is null!")
+		return
+	
+	# Find the UI node in the same way as high score display
+	var scene_root = parent_node.get_tree().current_scene
+	var ui_node = null
+	
+	if scene_root and scene_root.has_node("UI"):
+		ui_node = scene_root.get_node("UI")
+		print("Found UI node in scene")
+	elif parent_node.get_parent() and parent_node.get_parent().has_node("UI"):
+		ui_node = parent_node.get_parent().get_node("UI")
+		print("Found UI node in parent")
+	
+	if not ui_node:
+		print("WARNING: Could not find UI node for glyph display")
+		return
+	
+	# Create the glyph display as a simple label, similar to high score
+	glyph_display = Label.new()
+	glyph_display.name = "GlyphDisplay"
+	glyph_display.text = "Glyphs: 0"
+	glyph_display.position = Vector2(10, 50)  # Below high score display
+	glyph_display.size = Vector2(250, 60)
+	
+	# Style the label
+	glyph_display.add_theme_font_size_override("font_size", 16)
+	glyph_display.add_theme_color_override("font_color", Color.GOLD)
+	
+	ui_node.add_child(glyph_display)
+	print("Added glyph display to UI node as Label")
+
+func update_glyph_display(current_glyphs: int, stuck_glyphs: int = 0, stuck_level: int = 0):
+	"""Update the glyph display with current and stuck glyph counts"""
+	print("UIManager.update_glyph_display called: current=", current_glyphs, ", stuck=", stuck_glyphs, ", level=", stuck_level)
+	
+	if not glyph_display:
+		print("ERROR: glyph_display is null!")
+		return
+	
+	# Update the label text with both current and stuck glyphs
+	var glyph_text = "Glyphs: " + str(current_glyphs)
+	
+	if stuck_glyphs > 0 and stuck_level > 0:
+		glyph_text += "\nStuck at Level " + str(stuck_level) + ": " + str(stuck_glyphs) + " Glyphs"
+	
+	glyph_display.text = glyph_text
+	print("Updated glyph display text to: ", glyph_text)
+
+func show_glyph_reward_notification(glyph_count: int, enemy_type: String, grid_pos: Vector2):
+	"""Show a notification when glyphs are awarded"""
+	if not parent_node:
+		return
+	
+	# Create glyph reward notification text
+	var notification = Label.new()
+	var glyph_text = "+" + str(glyph_count) + " Glyph"
+	if glyph_count > 1:
+		glyph_text += "s"
+	
+	if enemy_type == "King":
+		notification.text = "KING: " + glyph_text + "!"
+	else:
+		notification.text = glyph_text + "!"
+	
+	notification.size = Vector2(150, 40)
+	
+	# Position near the defeated enemy
+	if grid_system:
+		var world_pos = grid_system.grid_to_world_pos(grid_pos)
+		notification.position = world_pos + Vector2(-50, -100)  # Above the enemy
+	else:
+		notification.position = Vector2(400, 200)  # Fallback position
+	
+	# Style the notification
+	notification.modulate = Color.GOLD
+	notification.z_index = 5
+	notification.add_theme_font_size_override("font_size", 16)
+	
+	parent_node.add_child(notification)
+	
+	# Animate the notification
+	var tween = parent_node.create_tween()
+	tween.parallel().tween_property(notification, "position:y", notification.position.y - 40, 2.0)
+	# Fade out after 2 seconds
+	tween.parallel().tween_property(notification, "modulate:a", 0.0, 2.5).set_delay(1.5)
+	tween.tween_callback(notification.queue_free)
 
 func show_attack_options(piece_data):
 	"""Show attack options for a selected piece"""
@@ -366,15 +460,15 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	var winner_label = Label.new()
 	if winner.to_lower() == "player":
 		if reason == "king_death":
-			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated the enemy King!" + army_info + "\n\nNext: Harder enemies await!"
+			winner_label.text = "VICTORY!\nYou defeated the enemy King!" + army_info + "\n\nNext: Harder enemies await!"
 		else:
-			winner_label.text = "🎉 VICTORY! 🎉\nYou defeated all enemies!" + army_info + "\n\nNext: Harder enemies await!"
+			winner_label.text = "VICTORY!\nYou defeated all enemies!" + army_info + "\n\nNext: Harder enemies await!"
 		winner_label.modulate = Color.GREEN
 	else:
 		if reason == "king_death":
-			winner_label.text = "💀 DEFEAT 💀\nYour King has fallen!" + army_info
+			winner_label.text = "DEFEAT\nYour King has fallen!" + army_info
 		else:
-			winner_label.text = "💀 DEFEAT 💀\nAll your pieces were destroyed!" + army_info
+			winner_label.text = "DEFEAT\nAll your pieces were destroyed!" + army_info
 		winner_label.modulate = Color.RED
 	
 	winner_label.add_theme_font_size_override("font_size", 18)
