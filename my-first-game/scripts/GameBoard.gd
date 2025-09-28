@@ -10,6 +10,7 @@ const UIManager = preload("res://scripts/components/UIManager.gd")
 const GameBoardAI = preload("res://scripts/components/GameBoardAI.gd")
 const ArmyManager = preload("res://scripts/systems/ArmyManager.gd")
 const Army = preload("res://scripts/systems/Army.gd")
+const HighScoreManager = preload("res://scripts/systems/HighScoreManager.gd")
 
 # Debug mode for testing
 var debug_mode = false
@@ -25,6 +26,7 @@ var input_handler
 var ui_manager
 var ai_system
 var army_manager
+var high_score_manager
 
 # Game state
 var game_manager = null
@@ -32,6 +34,7 @@ var turn_label = null
 var end_turn_button = null
 var player_indicator = null
 var enemy_indicator = null
+var high_score_label = null
 var ai_timer = null  # Store AI timer to cancel if needed
 
 func _ready():
@@ -47,6 +50,13 @@ func _ready():
 	# Initialize components
 	initialize_components()
 	
+	# Initialize high score manager
+	high_score_manager = HighScoreManager.new()
+	add_child(high_score_manager)
+	
+	# Connect to high score updates
+	high_score_manager.high_score_updated.connect(_on_high_score_updated)
+	
 	# Get references to game manager and UI elements  
 	game_manager = get_node("GameManager")
 	turn_label = get_node("UI/TurnDisplay/TurnLabel")
@@ -54,9 +64,19 @@ func _ready():
 	player_indicator = get_node("UI/PlayerIndicator")
 	enemy_indicator = get_node("UI/EnemyIndicator")
 	
+	# Try to get high score label, create if doesn't exist
+	if has_node("UI/HighScoreDisplay"):
+		high_score_label = get_node("UI/HighScoreDisplay")
+	else:
+		# Create high score display dynamically
+		create_high_score_display()
+	
 	# Now that game_manager is available, set it in the input handler
 	if input_handler and game_manager:
 		input_handler.set_game_manager(game_manager)
+	
+	# Update high score display
+	update_high_score_display()
 	
 	# Connect signals
 	if game_manager:
@@ -384,9 +404,21 @@ func restart_battle(winner: String = ""):
 	if winner.to_lower() == "player" and army_manager:
 		army_manager.advance_to_next_army()
 		print("Player won - Advanced to next army level")
+		
+		# Update high score tracking
+		if high_score_manager:
+			var new_level = army_manager.get_current_level()
+			high_score_manager.update_current_level(new_level)
+			high_score_manager.increment_battles_won()
+		
 	elif winner.to_lower() != "player" and army_manager:
 		army_manager.reset_to_first_army()
 		print("Player defeated - Army reset to Level 1")
+		
+		# Reset current level but keep high score
+		if high_score_manager:
+			high_score_manager.reset_current_level()
+			high_score_manager.increment_games_played()
 	
 	var new_level = army_manager.get_current_level() if army_manager else 1
 	print("Restarting battle with current army: ", army_manager.get_current_army().army_name)
@@ -422,3 +454,41 @@ func restart_battle(winner: String = ""):
 	
 	print("Battle restart complete!")
 	is_restarting = false
+	
+	# Update high score display
+	update_high_score_display()
+
+func create_high_score_display():
+	"""Create high score display dynamically if it doesn't exist in scene"""
+	var ui_node = get_node("UI")
+	if ui_node:
+		high_score_label = Label.new()
+		high_score_label.name = "HighScoreDisplay"
+		high_score_label.text = "High Score: Level 1"
+		high_score_label.position = Vector2(10, 10)  # Top-left corner
+		high_score_label.size = Vector2(200, 30)
+		
+		# Style the label
+		high_score_label.add_theme_color_override("font_color", Color.YELLOW)
+		
+		ui_node.add_child(high_score_label)
+		print("Created high score display")
+	else:
+		print("WARNING: Could not find UI node to add high score display")
+
+func update_high_score_display():
+	"""Update the high score display with current stats"""
+	if high_score_label and high_score_manager:
+		var current_level = high_score_manager.get_current_level()
+		var high_score = high_score_manager.get_high_score()
+		var games_played = high_score_manager.get_games_played()
+		
+		# Format: "Level 2/4 | Games: 5 | Record: Level 4"  
+		high_score_label.text = "Level %d/%d | Games: %d | Record: Level %d" % [current_level, high_score, games_played, high_score]
+	elif high_score_label:
+		high_score_label.text = "High Score: Level 1"
+
+func _on_high_score_updated(new_high_score: int):
+	"""Handle high score updates"""
+	print("NEW HIGH SCORE ACHIEVED: Level ", new_high_score)
+	update_high_score_display()
