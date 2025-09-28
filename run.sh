@@ -1,1 +1,1 @@
-cd /home/hoggb/gdot-game-test && ./godot --path my-first-game --audio-driver Dummy
+cd /home/hoggb/gdot-game-test && ./godot --path my-first-game

@@ -12,6 +12,12 @@ var game_manager = null
 
 var current_mode = "MOVE"  # "MOVE" or "ATTACK"
 
+# Drag state tracking
+var is_dragging = false
+var drag_start_pos = Vector2.ZERO
+var drag_start_grid = Vector2.ZERO
+var drag_hover_grid = Vector2(-1, -1)  # Current hover position during drag
+
 signal left_click_processed(grid_pos)
 signal right_click_processed(grid_pos)
 signal mode_changed(new_mode)
@@ -46,19 +52,128 @@ func _ready():
 			parent_node._input = _input
 
 func _input(event):
-	"""Process input events"""
+	"""Process input events with drag support"""
 	# Only allow input during player's turn
 	if game_manager and game_manager.current_team != "player":
 		print("Input blocked - current team: ", game_manager.current_team)
 		return
-		
-	if event is InputEventMouseButton and event.pressed:
-		# Convert screen coordinates to world coordinates
+	
+	if event is InputEventMouseButton:
 		var world_pos = parent_node.get_global_mouse_position()
+		var grid_pos = grid_system.world_to_grid_pos(world_pos)
+		
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			handle_left_click(world_pos)
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.pressed:
+				# Mouse down - start potential drag
+				start_drag(world_pos, grid_pos)
+			else:
+				# Mouse up - end drag or handle click
+				end_drag(world_pos, grid_pos)
+		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			handle_right_click(world_pos)
+	
+	elif event is InputEventMouseMotion and is_dragging:
+		# Handle drag motion
+		handle_drag_motion(event.position)
+
+func start_drag(world_pos: Vector2, grid_pos: Vector2):
+	"""Start drag operation"""
+	if not grid_system.is_valid_position(grid_pos):
+		return
+	
+	# Check if there's a player piece to drag
+	if piece_manager.is_position_occupied(grid_pos):
+		var piece = piece_manager.get_piece_at_position(grid_pos)
+		if piece.team == "player":
+			is_dragging = true
+			drag_start_pos = world_pos
+			drag_start_grid = grid_pos
+			drag_hover_grid = grid_pos  # Initialize hover position to start position
+			
+			# Highlight the piece being dragged
+			if ui_manager:
+				ui_manager.highlight_drag_position(grid_pos)
+			
+			print("Started dragging piece at: ", grid_pos)
+
+func handle_drag_motion(screen_pos: Vector2):
+	"""Handle drag motion with safe hover highlighting"""
+	if not is_dragging or not ui_manager:
+		return
+	
+	# Convert screen position to world position and then to grid
+	var world_pos = parent_node.get_global_mouse_position()
+	var grid_pos = grid_system.world_to_grid_pos(world_pos)
+	
+	# Only update if we're hovering over a different grid position
+	if grid_pos != drag_hover_grid:
+		# Clear previous hover highlight
+		ui_manager.clear_hover_highlights()
+		
+		# Update hover position
+		drag_hover_grid = grid_pos
+		
+		# Only highlight valid move positions: adjacent, empty squares
+		if (grid_system.is_valid_position(grid_pos) and 
+			grid_pos != drag_start_grid and
+			drag_start_grid.distance_to(grid_pos) <= 1.5 and
+			not piece_manager.is_position_occupied(grid_pos)):
+			ui_manager.highlight_hover_position(grid_pos)
+
+func end_drag(world_pos: Vector2, grid_pos: Vector2):
+	"""End drag operation"""
+	if is_dragging:
+		# Clear drag and hover highlighting
+		if ui_manager:
+			ui_manager.clear_drag_highlights()
+			ui_manager.clear_hover_highlights()
+		
+		var drag_distance = drag_start_pos.distance_to(world_pos)
+		
+		if drag_distance > 10.0:
+			# This was a drag - attempt move/attack
+			handle_drag_drop(drag_start_grid, grid_pos)
+		else:
+			# This was just a click
+			handle_left_click(world_pos)
+		
+		# Reset drag state
+		is_dragging = false
+		drag_start_pos = Vector2.ZERO
+		drag_start_grid = Vector2.ZERO
+		drag_hover_grid = Vector2(-1, -1)
+	else:
+		# Normal click
+		handle_left_click(world_pos)
+
+func handle_drag_drop(start_grid: Vector2, end_grid: Vector2):
+	"""Handle piece being dragged from start to end - MOVE ONLY"""
+	if not grid_system.is_valid_position(end_grid):
+		print("Invalid drop position")
+		return
+	
+	if start_grid == end_grid:
+		print("Dropped on same position")
+		return
+	
+	# Check if move is adjacent
+	var distance = start_grid.distance_to(end_grid)
+	if distance > 1.5:  # Allow diagonal (sqrt(2) ≈ 1.41)
+		print("Can only drag to adjacent squares")
+		return
+	
+	print("Drag drop from ", start_grid, " to ", end_grid)
+	
+	# Only allow movement to empty squares - NO ATTACKS via drag
+	if piece_manager.is_position_occupied(end_grid):
+		print("Cannot drag to occupied square - use right-click for attacks")
+		return
+	
+	# Perform move
+	print("Drag move!")
+	if piece_manager.move_piece(start_grid, end_grid):
+		if game_manager:
+			game_manager.use_action()
 
 func handle_left_click(world_pos: Vector2):
 	"""Handle left mouse click"""
@@ -94,11 +209,27 @@ func handle_right_click(world_pos: Vector2):
 	# Right click on a piece to show attack options
 	if piece_manager.is_position_occupied(grid_pos):
 		var piece = piece_manager.get_piece_at_position(grid_pos)
+		
+		# Add safety checks
+		if not piece:
+			print("ERROR: piece is null at position ", grid_pos)
+			return
+		
+		if not piece.has("team"):
+			print("ERROR: piece has no team property at position ", grid_pos)
+			return
+		
 		# Only allow right-clicking own pieces
 		if piece.team == "player":
 			piece_manager.select_piece(grid_pos)
-			if ui_manager:
+			
+			# Add safety check for UI manager and piece structure
+			if ui_manager and piece.has("piece_node") and is_instance_valid(piece.piece_node):
 				ui_manager.show_attack_options(piece)
+			else:
+				print("ERROR: Invalid piece structure or UI manager for attack options")
+				return
+			
 			set_mode("ATTACK")
 			print("Setting attack mode for piece at ", grid_pos)
 		else:
@@ -136,16 +267,16 @@ func handle_move_click(grid_pos: Vector2):
 			piece_manager.clear_selection()
 		else:
 			print("Cannot move there!")
-	# If clicked on a piece, select it
+	# If clicked on a piece, show info briefly instead of persistent selection
 	elif piece_manager.is_position_occupied(grid_pos):
 		var piece = piece_manager.get_piece_at_position(grid_pos)
-		# Only allow selecting own pieces
 		if piece.team == "player":
-			piece_manager.select_piece(grid_pos)
+			print("Player piece info: ", piece.piece_node.piece_type, " HP:", piece.piece_node.current_health, "/", piece.piece_node.max_health, " ATK:", piece.piece_node.attack_power)
 		else:
-			print("Cannot select enemy pieces!")
-	# If clicked empty tile with no selection, do nothing
+			print("Enemy piece: ", piece.piece_node.piece_type, " HP:", piece.piece_node.current_health, "/", piece.piece_node.max_health)
+	# If clicked empty tile, clear any lingering selection
 	else:
+		print("Empty space at ", grid_pos)
 		piece_manager.clear_selection()
 
 func handle_attack_click(grid_pos: Vector2):

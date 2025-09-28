@@ -10,6 +10,8 @@ const ATTACK_HIGHLIGHT_COLOR = Color(1.0, 0.3, 0.3, 0.6)
 
 var attack_ui = null
 var attack_highlights = []
+var drag_highlights = []  # Store references to drag highlight ColorRects
+var hover_highlights = []  # Store references to hover target highlights
 var game_over_overlay = null  # Store reference to game over screen
 
 var parent_node = null
@@ -59,10 +61,32 @@ func create_attack_ui():
 func show_attack_options(piece_data):
 	"""Show attack options for a selected piece"""
 	if not attack_ui:
+		print("ERROR: attack_ui is null")
+		return
+	
+	if not piece_data:
+		print("ERROR: piece_data is null")
+		return
+	
+	if not piece_data.has("piece_node"):
+		print("ERROR: piece_data has no piece_node property")
 		return
 	
 	var piece_node = piece_data.piece_node
+	
+	if not is_instance_valid(piece_node):
+		print("ERROR: piece_node is not valid")
+		return
+	
+	if not piece_node.has_method("get_available_attacks"):
+		print("ERROR: piece_node has no get_available_attacks method")
+		return
+	
 	var attacks = piece_node.get_available_attacks()
+	
+	if not attacks:
+		print("WARNING: piece has no available attacks")
+		attacks = []
 	
 	# Clear previous buttons
 	var vbox = attack_ui.get_child(0).get_child(0)
@@ -165,6 +189,46 @@ func clear_attack_highlights():
 		if is_instance_valid(highlight):
 			highlight.queue_free()
 	attack_highlights.clear()
+
+func highlight_drag_position(grid_pos: Vector2):
+	"""Create drag selection highlight"""
+	if not grid_system or not parent_node:
+		return
+	
+	var highlight = ColorRect.new()
+	highlight.size = Vector2(80, 80)  # TILE_SIZE = 80
+	highlight.position = grid_system.grid_to_world_pos(grid_pos)
+	highlight.color = SELECTED_COLOR
+	highlight.z_index = 1
+	parent_node.add_child(highlight)
+	drag_highlights.append(highlight)
+
+func clear_drag_highlights():
+	"""Clear all drag selection highlights"""
+	for highlight in drag_highlights:
+		if is_instance_valid(highlight):
+			highlight.queue_free()
+	drag_highlights.clear()
+
+func highlight_hover_position(grid_pos: Vector2):
+	"""Create hover target highlight with different color"""
+	if not grid_system or not parent_node:
+		return
+	
+	var highlight = ColorRect.new()
+	highlight.size = Vector2(80, 80)  # TILE_SIZE = 80
+	highlight.position = grid_system.grid_to_world_pos(grid_pos)
+	highlight.color = HIGHLIGHT_COLOR  # Use yellow highlight for hover target
+	highlight.z_index = 1
+	parent_node.add_child(highlight)
+	hover_highlights.append(highlight)
+
+func clear_hover_highlights():
+	"""Clear all hover target highlights"""
+	for highlight in hover_highlights:
+		if is_instance_valid(highlight):
+			highlight.queue_free()
+	hover_highlights.clear()
 
 func clear_attack_ui():
 	"""Clear attack UI (alias for hide_attack_ui for compatibility)"""
@@ -351,3 +415,62 @@ func restart_battle(winner: String = ""):
 	else:
 		# Fallback to scene reload if restart_battle doesn't exist
 		get_tree().reload_current_scene()
+
+func show_error_message(message: String):
+	"""Show a temporary error message"""
+	if not parent_node:
+		return
+	
+	# Create temporary error label
+	var error_label = Label.new()
+	error_label.text = message
+	error_label.add_theme_font_size_override("font_size", 20)
+	error_label.modulate = Color.RED
+	error_label.position = Vector2(50, 50)
+	error_label.z_index = 20
+	
+	parent_node.add_child(error_label)
+	
+	# Remove after 2 seconds
+	await get_tree().create_timer(2.0).timeout
+	if is_instance_valid(error_label):
+		error_label.queue_free()
+
+func show_piece_info(grid_pos: Vector2):
+	"""Show information about a piece at the given position"""
+	if not parent_node or not parent_node.has_method("get_piece_manager"):
+		return
+	
+	var piece_manager = parent_node.piece_manager
+	if not piece_manager or not piece_manager.is_position_occupied(grid_pos):
+		return
+	
+	var piece_data = piece_manager.get_piece_at_position(grid_pos)
+	if not piece_data or not piece_data.has("piece_node"):
+		return
+	
+	var piece = piece_data.piece_node
+	var info_text = piece.piece_type.capitalize() + " (" + piece.team + ")"
+	info_text += "\nHP: " + str(piece.current_health) + "/" + str(piece.max_health)
+	info_text += "\nAttack: " + str(piece.attack_power)
+	info_text += "\nDefense: " + str(piece.defense)
+	
+	# Create temporary info panel
+	var info_panel = Panel.new()
+	info_panel.size = Vector2(200, 120)
+	info_panel.position = Vector2(100, 100)
+	info_panel.z_index = 15
+	
+	var info_label = Label.new()
+	info_label.text = info_text
+	info_label.position = Vector2(10, 10)
+	info_label.size = Vector2(180, 100)
+	info_label.add_theme_font_size_override("font_size", 14)
+	
+	info_panel.add_child(info_label)
+	parent_node.add_child(info_panel)
+	
+	# Remove after 3 seconds
+	await get_tree().create_timer(3.0).timeout
+	if is_instance_valid(info_panel):
+		info_panel.queue_free()
