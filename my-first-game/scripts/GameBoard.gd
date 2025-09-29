@@ -12,6 +12,7 @@ const ArmyManager = preload("res://scripts/systems/ArmyManager.gd")
 const Army = preload("res://scripts/systems/Army.gd")
 const HighScoreManager = preload("res://scripts/systems/HighScoreManager.gd")
 const GlyphManager = preload("res://scripts/systems/GlyphManager.gd")
+const ShopManager = preload("res://scripts/systems/ShopManager.gd")
 
 # Debug mode for testing
 var debug_mode = false
@@ -29,6 +30,7 @@ var ai_system
 var army_manager
 var high_score_manager
 var glyph_manager
+var shop_manager
 
 # Game state
 var game_manager = null
@@ -67,6 +69,20 @@ func _ready():
 	# Connect to glyph updates
 	glyph_manager.glyphs_changed.connect(_on_glyphs_changed)
 	glyph_manager.glyph_reward.connect(_on_glyph_reward)
+	
+	# Initialize shop manager
+	shop_manager = ShopManager.new()
+	add_child(shop_manager)
+	
+	# Connect to shop events
+	shop_manager.item_purchased.connect(_on_item_purchased)
+	shop_manager.shop_closed.connect(_on_shop_closed)
+	
+	# Set manager references in UI manager and connect signals
+	ui_manager.set_managers(glyph_manager, shop_manager, shop_manager.data_loader)
+	ui_manager.end_run_to_shop_signal.connect(_on_end_run_to_shop)
+	ui_manager.shop_closed_signal.connect(_on_shop_closed_from_ui)
+	ui_manager.start_new_run_signal.connect(_on_start_new_run)
 	
 	# Get references to game manager and UI elements  
 	game_manager = get_node("GameManager")
@@ -514,6 +530,56 @@ func restart_battle(winner: String = ""):
 	# Update high score display
 	update_high_score_display()
 
+func restart_battle_without_progression():
+	"""Restart the battle without any army progression or glyph loss - for voluntary new runs"""
+	
+	# Prevent recursive calls
+	if is_restarting:
+		print("WARNING: restart_battle_without_progression called while already restarting - ignoring")
+		return
+	is_restarting = true
+	
+	print("Starting battle restart without progression...")
+	
+	# Army should already be reset to level 1 by the caller
+	var current_level = army_manager.get_current_level() if army_manager else 1
+	print("Restarting battle at level: ", current_level)
+	
+	# Update AI difficulty for level 1
+	if ai_system:
+		if current_level == 1:
+			ai_system.set_difficulty_mode("easy")
+		else:
+			ai_system.set_difficulty_mode("medium")
+	
+	# Clear existing pieces
+	print("Clearing pieces...")
+	piece_manager.clear_all_pieces()
+	
+	# Wait a frame for cleanup
+	await get_tree().process_frame
+	
+	# Restart game manager
+	print("Restarting game manager...")
+	if game_manager:
+		game_manager.restart_game()
+	
+	# Re-setup pieces with current army stats
+	print("Setting up new pieces...")
+	piece_manager.setup_pieces()
+	
+	# Re-enable AI processing
+	if ai_system and is_instance_valid(ai_system):
+		ai_system.set_process(true)
+	else:
+		print("WARNING: AI system missing during restart!")
+	
+	print("Battle restart without progression complete!")
+	is_restarting = false
+	
+	# Update high score display
+	update_high_score_display()
+
 func create_high_score_display():
 	"""Create high score display dynamically if it doesn't exist in scene"""
 	var ui_node = get_node("UI")
@@ -562,3 +628,49 @@ func _on_glyph_reward(glyph_count: int, enemy_type: String, grid_pos: Vector2):
 	print("Glyph reward: +", glyph_count, " glyphs for defeating ", enemy_type)
 	if ui_manager:
 		ui_manager.show_glyph_reward_notification(glyph_count, enemy_type, grid_pos)
+
+func _on_item_purchased(item_id: String, cost: int):
+	"""Handle item purchases from shop"""
+	print("Item purchased: ", item_id, " for ", cost, " glyphs")
+	
+	# Deduct glyphs
+	if glyph_manager:
+		var success = glyph_manager.spend_glyphs(cost)
+		if success:
+			print("Purchase successful!")
+		else:
+			print("ERROR: Purchase failed - not enough glyphs")
+
+func _on_shop_closed():
+	"""Handle when shop is closed"""
+	print("Shop closed - returning to game")
+
+func _on_end_run_to_shop():
+	"""Handle when player chooses to end run and go to shop"""
+	print("Player chose to end run and go to shop")
+	if ui_manager:
+		ui_manager.show_shop()
+
+func _on_shop_closed_from_ui():
+	"""Handle when shop is closed from UI"""
+	print("Shop closed from UI - ending run")
+	# Player chose to end run, so reset to main menu or restart
+	_on_game_over("Shop", "player_ended_run")
+
+func _on_start_new_run():
+	"""Handle when player starts a new run from shop"""
+	print("Player chose to start new run from shop")
+	# Reset to level 1 and start a new game
+	if army_manager:
+		army_manager.reset_to_first_army()
+	
+	# Reset current level but keep high score
+	if high_score_manager:
+		high_score_manager.reset_current_level()
+		high_score_manager.increment_games_played()
+	
+	# Don't lose glyphs when starting new run voluntarily
+	print("Starting fresh run at Level 1 - preserving glyphs")
+	
+	# Restart the battle without any winner to avoid glyph loss logic
+	restart_battle_without_progression()

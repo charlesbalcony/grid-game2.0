@@ -4,6 +4,11 @@
 class_name UIManager
 extends Node
 
+# Signals
+signal end_run_to_shop_signal
+signal shop_closed_signal
+signal start_new_run_signal
+
 const HIGHLIGHT_COLOR = Color(1.0, 1.0, 0.5, 0.7)
 const SELECTED_COLOR = Color(0.3, 0.7, 1.0, 0.4)
 const ATTACK_HIGHLIGHT_COLOR = Color(1.0, 0.3, 0.3, 0.6)
@@ -14,9 +19,13 @@ var drag_highlights = []  # Store references to drag highlight ColorRects
 var hover_highlights = []  # Store references to hover target highlights
 var game_over_overlay = null  # Store reference to game over screen
 var glyph_display = null  # Store reference to glyph display UI
+var shop_overlay = null  # Store reference to shop UI
 
 var parent_node = null
 var grid_system = null
+var glyph_manager = null  # Reference to glyph manager
+var shop_manager = null  # Reference to shop manager
+var data_loader = null   # Reference to data loader
 
 func _init():
 	pass
@@ -28,6 +37,12 @@ func set_parent_node(node: Node2D):
 func set_grid_system(grid):
 	"""Set reference to the grid system"""
 	grid_system = grid
+
+func set_managers(glyph_mgr, shop_mgr, loader):
+	"""Set references to the managers"""
+	glyph_manager = glyph_mgr
+	shop_manager = shop_mgr
+	data_loader = loader
 
 func create_attack_ui():
 	"""Create the attack selection UI (initially hidden)"""
@@ -480,6 +495,17 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	# Set button text based on winner
 	if winner.to_lower() == "player":
 		restart_button.text = "Continue"  # Advancing to next army level
+		
+		# Add shop button for victories
+		var shop_button = Button.new()
+		shop_button.text = "End Run & Shop"
+		shop_button.size = Vector2(150, 40)
+		shop_button.pressed.connect(func():
+			clear_game_over()
+			end_run_to_shop()
+		)
+		vbox.add_child(shop_button)
+		
 	else:
 		restart_button.text = "Play Again"  # Restarting at level 1
 	restart_button.size = Vector2(150, 40)
@@ -568,3 +594,205 @@ func show_piece_info(grid_pos: Vector2):
 	await get_tree().create_timer(3.0).timeout
 	if is_instance_valid(info_panel):
 		info_panel.queue_free()
+
+# Shop-related functions
+func end_run_to_shop():
+	"""End run and open shop"""
+	end_run_to_shop_signal.emit()
+
+func clear_any_overlays():
+	"""Clear any active overlays"""
+	if game_over_overlay:
+		game_over_overlay.queue_free()
+		game_over_overlay = null
+	if shop_overlay:
+		shop_overlay.queue_free()
+		shop_overlay = null
+
+func create_overlay():
+	"""Create a basic overlay structure for dialogs"""
+	var overlay_data = {}
+	
+	# Create background overlay
+	var background = ColorRect.new()
+	background.color = Color(0, 0, 0, 0.8)
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.z_index = 10
+	parent_node.add_child(background)
+	overlay_data.background = background
+	
+	# Create main panel
+	var panel = Panel.new()
+	panel.size = Vector2(500, 400)
+	panel.position = Vector2(150, 100)
+	panel.z_index = 11
+	background.add_child(panel)
+	overlay_data.panel = panel
+	
+	# Create content container
+	var vbox_container = VBoxContainer.new()
+	vbox_container.position = Vector2(20, 20)
+	vbox_container.size = Vector2(460, 360)
+	panel.add_child(vbox_container)
+	overlay_data.vbox_container = vbox_container
+	
+	return overlay_data
+
+func show_shop():
+	"""Display the shop interface"""
+	clear_any_overlays()
+	
+	var overlay_data = create_overlay()
+	shop_overlay = overlay_data.background
+	
+	# Shop title
+	var title = Label.new()
+	title.text = "Mystic Shop"
+	title.add_theme_font_size_override("font_size", 24)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	overlay_data.vbox_container.add_child(title)
+	
+	# Get current glyphs
+	var current_glyphs = glyph_manager.get_current_glyphs()
+	var glyphs_label = Label.new()
+	glyphs_label.text = "Glyphs: " + str(current_glyphs)
+	glyphs_label.add_theme_font_size_override("font_size", 16)
+	glyphs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	overlay_data.vbox_container.add_child(glyphs_label)
+	
+	# Add separator
+	overlay_data.vbox_container.add_child(HSeparator.new())
+	
+	# Shop items container
+	var scroll_container = ScrollContainer.new()
+	scroll_container.custom_minimum_size = Vector2(400, 300)
+	var items_vbox = VBoxContainer.new()
+	scroll_container.add_child(items_vbox)
+	overlay_data.vbox_container.add_child(scroll_container)
+	
+	# Get shop items
+	var shop_items = shop_manager.get_shop_items()
+	
+	for item_data in shop_items:
+		if item_data:
+			var item_container = create_shop_item_display(item_data, current_glyphs)
+			items_vbox.add_child(item_container)
+	
+	# Buttons container
+	var buttons_container = HBoxContainer.new()
+	buttons_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	
+	# Start New Run button
+	var new_run_button = Button.new()
+	new_run_button.text = "Start New Run"
+	new_run_button.size = Vector2(140, 40)
+	new_run_button.pressed.connect(func():
+		start_new_run()
+	)
+	buttons_container.add_child(new_run_button)
+	
+	overlay_data.vbox_container.add_child(buttons_container)
+
+func create_shop_item_display(item_data: Dictionary, current_glyphs: int) -> Control:
+	"""Create a display for a single shop item"""
+	var item_container = HBoxContainer.new()
+	item_container.custom_minimum_size = Vector2(350, 50)
+	
+	# Item info container
+	var info_vbox = VBoxContainer.new()
+	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	
+	# Item name with rarity color
+	var name_label = Label.new()
+	name_label.text = item_data.name
+	name_label.add_theme_font_size_override("font_size", 14)
+	
+	# Set color based on rarity
+	var rarity_color = get_rarity_color(item_data.rarity)
+	name_label.add_theme_color_override("font_color", rarity_color)
+	
+	info_vbox.add_child(name_label)
+	
+	# Item description
+	var desc_label = Label.new()
+	desc_label.text = item_data.get("effect", "No description available")
+	desc_label.add_theme_font_size_override("font_size", 11)
+	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_vbox.add_child(desc_label)
+	
+	item_container.add_child(info_vbox)
+	
+	# Cost and purchase button container
+	var purchase_vbox = VBoxContainer.new()
+	
+	# Cost label
+	var cost_label = Label.new()
+	cost_label.text = str(item_data.cost) + " Glyphs"
+	cost_label.add_theme_font_size_override("font_size", 12)
+	cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	purchase_vbox.add_child(cost_label)
+	
+	# Purchase button
+	var purchase_button = Button.new()
+	purchase_button.text = "Buy"
+	purchase_button.size = Vector2(60, 25)
+	
+	# Check if affordable
+	var can_afford = current_glyphs >= item_data.cost
+	purchase_button.disabled = not can_afford
+	
+	if can_afford:
+		purchase_button.pressed.connect(func():
+			purchase_item(item_data.get("id", "unknown"))
+		)
+	
+	purchase_vbox.add_child(purchase_button)
+	
+	item_container.add_child(purchase_vbox)
+	
+	return item_container
+
+func get_rarity_color(rarity: String) -> Color:
+	"""Get color for item rarity"""
+	match rarity.to_lower():
+		"common":
+			return Color.WHITE
+		"uncommon":
+			return Color.CYAN
+		"rare":
+			return Color.YELLOW
+		"epic":
+			return Color.MAGENTA
+		"legendary":
+			return Color.ORANGE
+		_:
+			return Color.WHITE
+
+func purchase_item(item_id: String):
+	"""Attempt to purchase an item"""
+	var current_glyphs = glyph_manager.get_current_glyphs()
+	var result = shop_manager.purchase_item(item_id, current_glyphs)
+	if result.get("success", false):
+		print("Purchase successful!")
+		# Refresh shop display
+		show_shop()
+	else:
+		print("Failed to purchase item: ", item_id, " - ", result.get("error", "Unknown error"))
+
+func close_shop():
+	"""Close the shop interface"""
+	if shop_overlay:
+		shop_overlay.queue_free()
+		shop_overlay = null
+		
+	# Emit signal to return to main menu or end run
+	shop_closed_signal.emit()
+
+func start_new_run():
+	"""Start a new run from the shop"""
+	if shop_overlay:
+		shop_overlay.queue_free()
+		shop_overlay = null
+	
+	# Emit signal to start new run
+	start_new_run_signal.emit()

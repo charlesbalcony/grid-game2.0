@@ -1,0 +1,84 @@
+{
+  "items": [
+    {
+      "id": "warrior_ironclad_plate",
+      "name": "Ironclad Plate",
+      "type": "permanent",
+      "piece": "Warrior",
+      "effect": "Warrior permanently takes 25 less damage from melee attacks.",
+      "rarity": "uncommon"
+    },
+    {
+      "id": "warrior_berserker_helm",
+      "name": "Berserker Helm",
+      "type": "run",
+      "piece": "Warrior",
+      "effect": "When Warrior drops below 50% HP, gain +40 attack for the rest of the run.",
+      "rarity": "rare"
+    },
+    {
+      "id": "warrior_blood_oath",
+      "name": "Blood Oath",
+      "type": "level",
+      "piece": "Warrior",
+      "effect": "Sacrifice 25 HP at the start of this level to gain +60 attack for the rest of the level.",
+      "rarity": "rare"
+    },
+    {
+      "id": "warrior_warcry_horn",
+      "name": "Warcry Horn",
+      "type": "use",
+      "piece": "Warrior",
+      "effect": "All allies gain +25 attack for the next 2 turns.",
+      "rarity": "uncommon"
+    },
+    {
+      "id": "warrior_battle_standard",
+      "name": "Battle Standard",
+      "type": "level",
+      "piece": "Warrior",
+      "effect": "At the start of this level, all allies adjacent to the Warrior gain +25 defense for the entire level.",
+      "rarity": "rare"
+    },
+    {
+      "id": "king_golden_crown",
+      "name": "Golden Crown",
+      "type": "permanent",
+      "piece": "King",
+      "effect": "At the end of each battle, gain +20% extra Glyphs if the King took no damage.",
+      "rarity": "epic"
+    },
+    {
+      "id": "king_royal_vault",
+      "name": "Royal Vault",
+      "type": "run",
+      "piece": "King",
+      "effect": "All Glyphs earned during this run are preserved if the run ends in defeat.",
+      "rarity": "legendary"
+    },
+    {
+      "id": "king_last_stand_banner",
+      "name": "Last Stand Banner",
+      "type": "level",
+      "piece": "King",
+      "effect": "If the King takes damage this level, negate the first 50 damage and prevent Glyph loss. Consumed after this level.",
+      "rarity": "epic"
+    },
+    {
+      "id": "king_royal_command",
+      "name": "Royal Command",
+      "type": "use",
+      "piece": "King",
+      "effect": "Reposition one ally to any adjacent tile and heal them for 25 HP.",
+      "rarity": "rare"
+    },
+    {
+      "id": "king_divine_right",
+      "name": "Divine Right",
+      "type": "run",
+      "piece": "King",
+      "effect": "At the start of each battle this run, the King heals 25 HP.",
+      "rarity": "uncommon"
+    }
+  ]
+}

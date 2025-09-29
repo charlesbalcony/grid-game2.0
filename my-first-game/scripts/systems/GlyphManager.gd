@@ -158,3 +158,14 @@ func get_stuck_at_level() -> int:
 func get_total_glyphs_earned() -> int:
 	"""Get the total glyphs earned all-time"""
 	return total_glyphs_earned
+
+func spend_glyphs(amount: int) -> bool:
+	"""Spend glyphs if player has enough. Returns true if successful"""
+	if current_glyphs >= amount:
+		current_glyphs -= amount
+		print("Spent ", amount, " glyphs. Remaining: ", current_glyphs)
+		glyphs_changed.emit(current_glyphs, stuck_glyphs, stuck_at_level)
+		return true
+	else:
+		print("Not enough glyphs to spend ", amount, ". Current: ", current_glyphs)
+		return false
