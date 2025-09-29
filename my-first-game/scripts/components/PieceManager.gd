@@ -64,6 +64,10 @@ func create_piece(grid_pos: Vector2, color: Color, team: String, piece_type: Str
 	var piece_scene = preload("res://scenes/GamePiece.tscn")
 	var piece_instance = piece_scene.instantiate()
 	
+	# Generate unique ID for this piece instance
+	var piece_id = team + "_" + piece_type + "_" + str(grid_pos.x) + "_" + str(grid_pos.y) + "_" + str(randf())
+	piece_instance.piece_id = piece_id
+	
 	# Set piece properties
 	piece_instance.team = team
 	piece_instance.piece_type = piece_type
@@ -88,6 +92,13 @@ func create_piece(grid_pos: Vector2, color: Color, team: String, piece_type: Str
 	if team == "enemy":
 		apply_army_modifiers(piece_instance)
 	
+	# Register with LoadoutManager if it exists
+	if parent_node.has_method("get_loadout_manager"):
+		var loadout_manager = parent_node.get_loadout_manager()
+		if loadout_manager:
+			loadout_manager.register_piece_instance(piece_id, piece_type, grid_pos)
+			print("Registered piece with LoadoutManager: ", piece_id)
+	
 	# Connect signals
 	piece_instance.piece_died.connect(_on_piece_died)
 	piece_instance.piece_damaged.connect(_on_piece_damaged)
@@ -98,7 +109,8 @@ func create_piece(grid_pos: Vector2, color: Color, team: String, piece_type: Str
 	pieces[grid_pos] = {
 		"piece_node": piece_instance,
 		"team": team,
-		"color": color
+		"color": color,
+		"piece_id": piece_id
 	}
 
 func select_piece(grid_pos: Vector2) -> bool:

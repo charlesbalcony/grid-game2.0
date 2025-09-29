@@ -13,6 +13,7 @@ const Army = preload("res://scripts/systems/Army.gd")
 const HighScoreManager = preload("res://scripts/systems/HighScoreManager.gd")
 const GlyphManager = preload("res://scripts/systems/GlyphManager.gd")
 const ShopManager = preload("res://scripts/systems/ShopManager.gd")
+const LoadoutManager = preload("res://scripts/systems/LoadoutManager.gd")
 
 # Debug mode for testing
 var debug_mode = false
@@ -31,6 +32,7 @@ var army_manager
 var high_score_manager
 var glyph_manager
 var shop_manager
+var loadout_manager
 
 # Game state
 var game_manager = null
@@ -78,11 +80,29 @@ func _ready():
 	shop_manager.item_purchased.connect(_on_item_purchased)
 	shop_manager.shop_closed.connect(_on_shop_closed)
 	
+	# Initialize loadout manager
+	loadout_manager = LoadoutManager.new()
+	add_child(loadout_manager)
+	
+	# Connect to loadout events
+	loadout_manager.item_equipped.connect(_on_item_equipped)
+	loadout_manager.item_unequipped.connect(_on_item_unequipped)
+	
+	# Sync loadout manager with shop manager inventory
+	if shop_manager:
+		var shop_inventory = shop_manager.get_inventory()  
+		for item in shop_inventory:
+			var item_id = item.get("id", "")
+			if item_id != "":
+				loadout_manager.add_available_item(item_id)
+	
 	# Set manager references in UI manager and connect signals
 	ui_manager.set_managers(glyph_manager, shop_manager, shop_manager.data_loader)
+	ui_manager.set_loadout_manager(loadout_manager)
 	ui_manager.end_run_to_shop_signal.connect(_on_end_run_to_shop)
 	ui_manager.shop_closed_signal.connect(_on_shop_closed_from_ui)
 	ui_manager.start_new_run_signal.connect(_on_start_new_run)
+	ui_manager.loadout_complete_signal.connect(_on_loadout_complete)
 	
 	# Get references to game manager and UI elements  
 	game_manager = get_node("GameManager")
@@ -174,8 +194,7 @@ func initialize_components():
 	add_child(army_manager)
 	
 	# Initialize AI system (piece_manager was already created in initialize_components)
-	var ai_script = GameBoardAI
-	ai_system = ai_script.new()
+	ai_system = GameBoardAI.new()
 	ai_system.set_parent_node(self)
 	ai_system.set_grid_system(grid_system)
 	ai_system.set_piece_manager(piece_manager)
@@ -638,6 +657,9 @@ func _on_item_purchased(item_id: String, cost: int):
 		var success = glyph_manager.spend_glyphs(cost)
 		if success:
 			print("Purchase successful!")
+			# Add item to loadout manager inventory
+			if loadout_manager:
+				loadout_manager.add_available_item(item_id)
 		else:
 			print("ERROR: Purchase failed - not enough glyphs")
 
@@ -669,8 +691,40 @@ func _on_start_new_run():
 		high_score_manager.reset_current_level()
 		high_score_manager.increment_games_played()
 	
+	# Clear run-specific items but keep permanent ones
+	if loadout_manager:
+		loadout_manager.clear_run_items()
+	
 	# Don't lose glyphs when starting new run voluntarily
 	print("Starting fresh run at Level 1 - preserving glyphs")
 	
-	# Restart the battle without any winner to avoid glyph loss logic
-	restart_battle_without_progression()
+	# Show loadout screen before starting new run
+	show_run_loadout()
+
+func _on_item_equipped(piece_type: String, item_id: String, slot_type: String):
+	"""Handle when an item is equipped to a piece"""
+	print("Item equipped: ", item_id, " to ", piece_type, " in ", slot_type, " slot")
+
+func _on_item_unequipped(piece_type: String, item_id: String, slot_type: String):
+	"""Handle when an item is unequipped from a piece"""
+	print("Item unequipped: ", item_id, " from ", piece_type, " in ", slot_type, " slot")
+
+func get_loadout_manager():
+	"""Get reference to the loadout manager"""
+	return loadout_manager
+
+func show_run_loadout():
+	"""Show the loadout screen for beginning of run"""
+	if ui_manager:
+		ui_manager.show_loadout_screen("run")
+
+func _on_loadout_complete(screen_type: String):
+	"""Handle when loadout is complete"""
+	print("Loadout complete for: ", screen_type)
+	
+	if screen_type == "run":
+		# Start the actual battle after run loadout is complete
+		restart_battle_without_progression()
+	elif screen_type == "level":
+		# Continue to next level after level loadout is complete
+		print("Level loadout complete - continuing to battle")

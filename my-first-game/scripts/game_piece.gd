@@ -10,6 +10,7 @@ extends Node2D
 @export var defense: int = 0
 @export var movement_range: int = 1
 
+var piece_id: String = ""  # Unique identifier for this piece instance
 var grid_position: Vector2
 var is_selected: bool = false
 var is_alive: bool = true
