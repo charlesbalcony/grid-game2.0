@@ -45,6 +45,9 @@ var glyph_label = null
 var ai_timer = null  # Store AI timer to cancel if needed
 
 func _ready():
+	# Add to game_board group so pieces can find us
+	add_to_group("game_board")
+	
 	# Check for debug mode from command line arguments
 	var args = OS.get_cmdline_args()
 	for arg in args:
@@ -481,6 +484,10 @@ func restart_battle(winner: String = ""):
 	
 	print("Starting battle restart process...")
 	
+	# Force reset input blocking to ensure input is enabled for new game
+	if ui_manager and ui_manager.has_method("reset_input_blocking"):
+		ui_manager.reset_input_blocking()
+	
 	# Handle army progression based on winner
 	var old_level = army_manager.get_current_level() if army_manager else 1
 	if winner.to_lower() == "player" and army_manager:
@@ -559,6 +566,10 @@ func restart_battle_without_progression():
 	is_restarting = true
 	
 	print("Starting battle restart without progression...")
+	
+	# Force reset input blocking to ensure input is enabled for new game
+	if ui_manager and ui_manager.has_method("reset_input_blocking"):
+		ui_manager.reset_input_blocking()
 	
 	# Army should already be reset to level 1 by the caller
 	var current_level = army_manager.get_current_level() if army_manager else 1
@@ -704,10 +715,22 @@ func _on_start_new_run():
 func _on_item_equipped(piece_type: String, item_id: String, slot_type: String):
 	"""Handle when an item is equipped to a piece"""
 	print("Item equipped: ", item_id, " to ", piece_type, " in ", slot_type, " slot")
+	# Refresh item effects for all pieces of this type
+	refresh_piece_item_effects()
 
 func _on_item_unequipped(piece_type: String, item_id: String, slot_type: String):
 	"""Handle when an item is unequipped from a piece"""
 	print("Item unequipped: ", item_id, " from ", piece_type, " in ", slot_type, " slot")
+	# Refresh item effects for all pieces of this type
+	refresh_piece_item_effects()
+
+func refresh_piece_item_effects():
+	"""Refresh item effects for all pieces"""
+	if piece_manager:
+		for pos in piece_manager.pieces.keys():
+			var piece_data = piece_manager.pieces[pos]
+			if piece_data.has("piece_node") and piece_data.piece_node.has_method("refresh_item_effects"):
+				piece_data.piece_node.refresh_item_effects()
 
 func get_loadout_manager():
 	"""Get reference to the loadout manager"""

@@ -30,8 +30,18 @@ var shop_manager = null  # Reference to shop manager
 var data_loader = null   # Reference to data loader
 var loadout_manager = null  # Reference to loadout manager
 
+# Input blocking for modal overlays
+var is_blocking_input = false
+
 func _init():
 	pass
+
+func _unhandled_input(event):
+	"""Block all unhandled input when modal overlays are active"""
+	if is_blocking_input:
+		if event is InputEventMouseButton or event is InputEventMouseMotion or event is InputEventKey:
+			get_viewport().set_input_as_handled()
+			print("UIManager blocked input event: ", event.get_class())
 
 func set_parent_node(node: Node2D):
 	"""Set reference to the parent node"""
@@ -51,6 +61,28 @@ func set_loadout_manager(loadout_mgr):
 	"""Set reference to the loadout manager"""
 	loadout_manager = loadout_mgr
 
+func reset_input_blocking():
+	"""Force reset input blocking - for debugging stuck input"""
+	is_blocking_input = false
+	print("UIManager: FORCE RESET input blocking")
+	
+	# Re-enable game input - try multiple approaches
+	if parent_node:
+		# Method 1: Direct reference to input handler
+		if parent_node.has_method("get_node"):
+			var input_handler = parent_node.get_node_or_null("InputHandler")
+			if input_handler and input_handler.has_method("set_input_enabled"):
+				input_handler.set_input_enabled(true)
+				print("UIManager: FORCE RE-ENABLED input via InputHandler")
+		
+		# Method 2: Try to find input handler by searching children
+		for child in parent_node.get_children():
+			if child.get_script() and child.get_script().get_global_name() == "InputHandler":
+				if child.has_method("set_input_enabled"):
+					child.set_input_enabled(true)
+					print("UIManager: FORCE RE-ENABLED input via child search")
+				break
+
 func create_attack_ui():
 	"""Create the attack selection UI (initially hidden)"""
 	if not parent_node:
@@ -58,16 +90,23 @@ func create_attack_ui():
 	
 	attack_ui = Control.new()
 	attack_ui.visible = false
+	attack_ui.size = Vector2(get_viewport().size)  # Convert Vector2i to Vector2
 	
 	var panel = Panel.new()
-	panel.size = Vector2(200, 150)
-	panel.position = Vector2(600, 50)
+	panel.size = Vector2(300, 250)  # Made larger to accommodate item lists
+	# Center the panel on screen
+	panel.position = (Vector2(get_viewport().size) - panel.size) / 2  # Convert Vector2i to Vector2
+	panel.add_theme_color_override("bg_color", Color(0.2, 0.2, 0.3, 0.9))
 	
 	var vbox = VBoxContainer.new()
 	vbox.position = Vector2(10, 10)
+	vbox.size = Vector2(panel.size.x - 20, panel.size.y - 20)  # Leave margins
+	vbox.add_theme_constant_override("separation", 5)
 	
 	var label = Label.new()
 	label.text = "Select Attack:"
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color.CYAN)
 	vbox.add_child(label)
 	
 	# We'll add attack buttons dynamically when a piece is selected
@@ -204,11 +243,33 @@ func show_attack_options(piece_data):
 		print("WARNING: piece has no available attacks")
 		attacks = []
 	
-	# Clear previous buttons
-	var vbox = attack_ui.get_child(0).get_child(0)
-	for child in vbox.get_children():
-		if child is Button:
-			child.queue_free()
+	# Clear previous buttons and items completely
+	if not attack_ui or attack_ui.get_child_count() == 0:
+		print("ERROR: attack_ui not properly initialized")
+		return
+	
+	var panel = attack_ui.get_child(0)  # Should be the Panel
+	if not panel or panel.get_child_count() == 0:
+		print("ERROR: attack_ui panel not found")
+		return
+	
+	var vbox = panel.get_child(0)  # Should be the VBoxContainer
+	if not vbox:
+		print("ERROR: attack_ui vbox not found")
+		return
+	
+	# Clear all children except the first label
+	var children_to_remove = []
+	for i in range(vbox.get_child_count()):
+		var child = vbox.get_child(i)
+		if i > 0:  # Keep the first child (the "Select Attack:" label)
+			children_to_remove.append(child)
+	
+	for child in children_to_remove:
+		child.queue_free()
+	
+	# Wait a frame for cleanup
+	await get_tree().process_frame
 	
 	# Add attack buttons
 	for i in range(attacks.size()):
@@ -223,43 +284,96 @@ func show_attack_options(piece_data):
 		var separator = HSeparator.new()
 		vbox.add_child(separator)
 	
-	# Add use items section
+	# Add equipped items section
 	var items_label = Label.new()
-	items_label.text = "Use Items:"
+	items_label.text = "Equipped Items:"
 	items_label.add_theme_font_size_override("font_size", 12)
+	items_label.add_theme_color_override("font_color", Color.CYAN)
 	vbox.add_child(items_label)
 	
-	# Get piece ID and use items
+	# Get piece ID and all equipped items
 	var piece_id = piece_data.get("piece_id", "")
 	if piece_id != "" and loadout_manager:
-		var use_items = loadout_manager.get_equipped_items(piece_id, "use")
+		var all_equipped_items = loadout_manager.get_equipped_items(piece_id)  # Get all items
 		
-		if use_items.size() > 0:
-			for item_id in use_items:
+		if all_equipped_items.size() > 0:
+			# Group items by slot type for better organization
+			var items_by_slot = {}
+			for item_id in all_equipped_items:
 				var item_data = data_loader.get_item_by_id(item_id) if data_loader else null
 				if item_data:
-					var item_button = Button.new()
-					item_button.text = item_data.name
-					item_button.add_theme_font_size_override("font_size", 10)
+					var slot_type = item_data.get("type", "unknown")
+					if not items_by_slot.has(slot_type):
+						items_by_slot[slot_type] = []
+					items_by_slot[slot_type].append({item_id = item_id, item_data = item_data})
+			
+			# Display items grouped by slot type
+			var slot_order = ["permanent", "run", "level", "use"]
+			for slot_type in slot_order:
+				if items_by_slot.has(slot_type):
+					# Add slot type header
+					var slot_header = Label.new()
+					var slot_name = slot_type.capitalize() + " Items:"
+					slot_header.text = slot_name
+					slot_header.add_theme_font_size_override("font_size", 10)
+					match slot_type:
+						"permanent":
+							slot_header.add_theme_color_override("font_color", Color.GOLD)
+						"run":
+							slot_header.add_theme_color_override("font_color", Color.LIGHT_BLUE)
+						"level":
+							slot_header.add_theme_color_override("font_color", Color.YELLOW)
+						"use":
+							slot_header.add_theme_color_override("font_color", Color.LIGHT_GREEN)
+					vbox.add_child(slot_header)
 					
-					# Create item description tooltip or label
-					var item_container = VBoxContainer.new()
-					item_container.add_child(item_button)
-					
-					var item_desc = Label.new()
-					item_desc.text = item_data.get("description", "No description")
-					item_desc.add_theme_font_size_override("font_size", 8)
-					item_desc.modulate = Color(0.8, 0.8, 0.8)
-					item_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-					item_container.add_child(item_desc)
-					
-					# Connect button to use item
-					item_button.pressed.connect(func(): use_item_in_combat(piece_id, item_id, item_data))
-					
-					vbox.add_child(item_container)
+					# Add items in this slot
+					for item_info in items_by_slot[slot_type]:
+						var item_id = item_info.item_id
+						var item_data = item_info.item_data
+						
+						if slot_type == "use":
+							# Use items get clickable buttons
+							var item_button = Button.new()
+							item_button.text = "Use: " + item_data.name
+							item_button.add_theme_font_size_override("font_size", 10)
+							
+							# Create item description tooltip or label
+							var item_container = VBoxContainer.new()
+							item_container.add_child(item_button)
+							
+							var item_desc = Label.new()
+							item_desc.text = item_data.get("description", "No description")
+							item_desc.add_theme_font_size_override("font_size", 8)
+							item_desc.modulate = Color(0.8, 0.8, 0.8)
+							item_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+							item_container.add_child(item_desc)
+							
+							# Connect button to use item
+							item_button.pressed.connect(func(): use_item_in_combat(piece_id, item_id, item_data))
+							
+							vbox.add_child(item_container)
+						else:
+							# Non-use items are displayed as info labels
+							var item_container = VBoxContainer.new()
+							
+							var item_name = Label.new()
+							item_name.text = "• " + item_data.name
+							item_name.add_theme_font_size_override("font_size", 10)
+							item_name.add_theme_color_override("font_color", Color.WHITE)
+							item_container.add_child(item_name)
+							
+							var item_desc = Label.new()
+							item_desc.text = "  " + item_data.get("effect", item_data.get("description", "No description"))
+							item_desc.add_theme_font_size_override("font_size", 8)
+							item_desc.modulate = Color(0.8, 0.8, 0.8)
+							item_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+							item_container.add_child(item_desc)
+							
+							vbox.add_child(item_container)
 		else:
 			var no_items_label = Label.new()
-			no_items_label.text = "No use items equipped"
+			no_items_label.text = "No items equipped"
 			no_items_label.add_theme_font_size_override("font_size", 10)
 			no_items_label.modulate = Color(0.6, 0.6, 0.6)
 			vbox.add_child(no_items_label)
@@ -269,6 +383,10 @@ func show_attack_options(piece_data):
 	cancel_button.text = "Cancel"
 	cancel_button.pressed.connect(func(): hide_attack_ui())
 	vbox.add_child(cancel_button)
+	
+	# Make the attack UI visible!
+	attack_ui.visible = true
+	print("Attack UI shown for piece: ", piece_node.piece_type)
 
 func use_item_in_combat(piece_id: String, item_id: String, item_data: Dictionary):
 	"""Use a consumable item during combat"""
@@ -753,6 +871,16 @@ func end_run_to_shop():
 
 func clear_any_overlays():
 	"""Clear any active overlays"""
+	# Disable input blocking
+	is_blocking_input = false
+	print("UIManager: Input blocking DISABLED (clearing overlays)")
+	
+	# Re-enable game input when clearing overlays
+	if parent_node and parent_node.has_method("get_node"):
+		var input_handler = parent_node.get_node_or_null("InputHandler")
+		if input_handler and input_handler.has_method("set_input_enabled"):
+			input_handler.set_input_enabled(true)
+	
 	if game_over_overlay:
 		game_over_overlay.queue_free()
 		game_over_overlay = null
@@ -765,12 +893,23 @@ func clear_any_overlays():
 
 func create_overlay():
 	"""Create a basic overlay structure for dialogs"""
+	# Enable input blocking at the UIManager level
+	is_blocking_input = true
+	print("UIManager: Input blocking ENABLED for overlay")
+	
+	# Disable game input while overlay is active
+	if parent_node and parent_node.has_method("get_node"):
+		var input_handler = parent_node.get_node_or_null("InputHandler")
+		if input_handler and input_handler.has_method("set_input_enabled"):
+			input_handler.set_input_enabled(false)
+	
 	var overlay_data = {}
 	
 	# Create background overlay
 	var background = ColorRect.new()
 	background.color = Color(0, 0, 0, 0.8)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_STOP  # Block mouse events from passing through
 	background.z_index = 10
 	parent_node.add_child(background)
 	overlay_data.background = background
@@ -955,13 +1094,49 @@ func show_loadout_screen(screen_type: String):
 	"""Show the dedicated loadout screen with only player pieces in formation"""
 	clear_any_overlays()
 	
-	# Create full-screen background
+	# Enable input blocking at the UIManager level
+	is_blocking_input = true
+	print("UIManager: Input blocking ENABLED for loadout screen")
+	
+	# Disable game input while loadout is active - try multiple approaches
+	if parent_node:
+		# Method 1: Direct reference to input handler
+		if parent_node.has_method("get_node"):
+			var input_handler = parent_node.get_node_or_null("InputHandler")
+			if input_handler and input_handler.has_method("set_input_enabled"):
+				input_handler.set_input_enabled(false)
+				print("UIManager: Disabled input via InputHandler")
+		
+		# Method 2: Try to find input handler by searching children
+		for child in parent_node.get_children():
+			if child.get_script() and child.get_script().get_global_name() == "InputHandler":
+				if child.has_method("set_input_enabled"):
+					child.set_input_enabled(false)
+					print("UIManager: Disabled input via child search")
+				break
+	
+	# Create full-screen background that blocks input
 	var background = ColorRect.new()
 	background.color = Color(0.1, 0.1, 0.15, 0.95)  # Dark blue-gray background
-	background.size = get_viewport().size
+	background.size = Vector2(get_viewport().size)  # Convert Vector2i to Vector2
 	background.position = Vector2.ZERO
-	parent_node.add_child(background)
+	background.mouse_filter = Control.MOUSE_FILTER_STOP  # Block mouse events from passing through
+	
+	# Add to the scene tree at the highest level to ensure it's on top and blocks input
+	var scene_root = parent_node.get_tree().current_scene
+	scene_root.add_child(background)
 	loadout_overlay = background
+	
+	# Make sure the overlay has the highest z-index
+	background.z_index = 1000
+	
+	# Add custom input handling to consume all input events
+	background.gui_input.connect(func(event): 
+		# Consume all input events to prevent them from reaching the background
+		if event is InputEventMouseButton or event is InputEventMouseMotion:
+			background.accept_event()
+			print("Loadout overlay consumed input event: ", event)
+	)
 	
 	# Main container
 	var main_container = VBoxContainer.new()
@@ -1045,6 +1220,16 @@ func show_loadout_screen(screen_type: String):
 	back_button.size = Vector2(150, 50)
 	back_button.add_theme_font_size_override("font_size", 16)
 	back_button.pressed.connect(func():
+		# Disable input blocking
+		is_blocking_input = false
+		print("UIManager: Input blocking DISABLED (back button)")
+		
+		# Re-enable game input
+		if parent_node and parent_node.has_method("get_node"):
+			var input_handler = parent_node.get_node_or_null("InputHandler")
+			if input_handler and input_handler.has_method("set_input_enabled"):
+				input_handler.set_input_enabled(true)
+		
 		if loadout_overlay:
 			loadout_overlay.queue_free()
 			loadout_overlay = null
@@ -1430,6 +1615,27 @@ func determine_slot_type(item_data: Dictionary, screen_type: String) -> String:
 
 func complete_loadout(screen_type: String):
 	"""Complete the loadout process and continue"""
+	# Disable input blocking
+	is_blocking_input = false
+	print("UIManager: Input blocking DISABLED")
+	
+	# Re-enable game input - try multiple approaches
+	if parent_node:
+		# Method 1: Direct reference to input handler
+		if parent_node.has_method("get_node"):
+			var input_handler = parent_node.get_node_or_null("InputHandler")
+			if input_handler and input_handler.has_method("set_input_enabled"):
+				input_handler.set_input_enabled(true)
+				print("UIManager: Re-enabled input via InputHandler")
+		
+		# Method 2: Try to find input handler by searching children
+		for child in parent_node.get_children():
+			if child.get_script() and child.get_script().get_global_name() == "InputHandler":
+				if child.has_method("set_input_enabled"):
+					child.set_input_enabled(true)
+					print("UIManager: Re-enabled input via child search")
+				break
+	
 	if loadout_overlay:
 		loadout_overlay.queue_free()
 		loadout_overlay = null

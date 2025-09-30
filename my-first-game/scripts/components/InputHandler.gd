@@ -16,6 +16,9 @@ var current_mode = "MOVE"  # "MOVE" or "ATTACK"
 var debug_mode = false
 var god_mode = false
 
+# Input state
+var input_enabled = true  # Can be disabled to block all input
+
 # Drag state tracking
 var is_dragging = false
 var drag_start_pos = Vector2.ZERO
@@ -50,13 +53,27 @@ func set_game_manager(gm):
 	game_manager = gm
 
 func set_debug_mode(enabled: bool):
-	"""Enable debug/god mode for testing"""
+	"""Enable or disable debug mode"""
 	debug_mode = enabled
 	god_mode = enabled
 	if enabled:
 		print("InputHandler: God mode ENABLED - instant kills from any distance!")
 	else:
 		print("InputHandler: Debug mode disabled")
+
+func set_input_enabled(enabled: bool):
+	"""Enable or disable input processing"""
+	input_enabled = enabled
+	if enabled:
+		print("InputHandler: Input ENABLED")
+	else:
+		print("InputHandler: Input DISABLED")
+		# Clear any ongoing interactions when disabling
+		if piece_manager:
+			piece_manager.clear_selection()
+		if ui_manager:
+			ui_manager.clear_attack_ui()
+		set_mode("MOVE")
 
 func _ready():
 	if parent_node:
@@ -66,6 +83,10 @@ func _ready():
 
 func _input(event):
 	"""Process input events with drag support"""
+	# Check if input is enabled
+	if not input_enabled:
+		return
+	
 	# Only allow input during player's turn
 	if game_manager and game_manager.current_team != "player":
 		print("Input blocked - current team: ", game_manager.current_team)
@@ -218,6 +239,19 @@ func handle_right_click(world_pos: Vector2):
 		return
 	
 	print("Right click at ", grid_pos, " in mode: ", current_mode)
+	
+	# Debug mode: Shift+Right-click any piece to show stats
+	if debug_mode and Input.is_physical_key_pressed(KEY_SHIFT) and piece_manager.is_position_occupied(grid_pos):
+		var piece = piece_manager.get_piece_at_position(grid_pos)
+		if piece and piece.has("piece_node") and is_instance_valid(piece.piece_node):
+			var piece_node = piece.piece_node
+			if piece_node.has_method("debug_show_stats"):
+				piece_node.debug_show_stats()
+			# Also try to reapply item effects
+			if piece_node.has_method("apply_equipped_item_effects"):
+				print("DEBUG: Manually reapplying item effects...")
+				piece_node.apply_equipped_item_effects()
+		return
 	
 	# God mode: Right-click enemy to instantly kill
 	if god_mode and piece_manager.is_position_occupied(grid_pos):

@@ -219,6 +219,7 @@ func save_loadouts():
 
 func load_loadouts():
 	"""Load loadouts from file"""
+	print("=== LOADING LOADOUTS FROM DISK ===")
 	if FileAccess.file_exists(SAVE_FILE_PATH):
 		var file = FileAccess.open(SAVE_FILE_PATH, FileAccess.READ)
 		if file:
@@ -231,16 +232,48 @@ func load_loadouts():
 				var save_data = json.data
 				
 				if save_data.has("loadouts"):
-					piece_loadouts = save_data["loadouts"]
+					var loaded_loadouts = save_data["loadouts"]
+					piece_loadouts = {}
+					
+					# Migrate old random IDs to new deterministic IDs
+					print("Migrating loadout IDs...")
+					for old_piece_id in loaded_loadouts.keys():
+						var loadout_data = loaded_loadouts[old_piece_id]
+						var piece_type = loadout_data.get("piece_type", "")
+						var grid_pos = loadout_data.get("grid_position", Vector2.ZERO)
+						
+						# Check if this is an old random ID (contains a decimal point)
+						if "." in old_piece_id:
+							# Extract team from old ID
+							var team = "player" if old_piece_id.begins_with("player_") else "enemy"
+							# Create new deterministic ID
+							var new_piece_id = team + "_" + piece_type + "_" + str(grid_pos.x) + "_" + str(grid_pos.y)
+							print("  Migrating: ", old_piece_id, " -> ", new_piece_id)
+							piece_loadouts[new_piece_id] = loadout_data
+						else:
+							# Already has new format
+							piece_loadouts[old_piece_id] = loadout_data
+					
+					print("Loaded piece loadouts: ", piece_loadouts.keys().size(), " pieces")
+					for piece_id in piece_loadouts.keys():
+						var loadout = piece_loadouts[piece_id]
+						var permanent_items = loadout.get("permanent", [])
+						if permanent_items.size() > 0:
+							print("  - ", piece_id, " (", loadout.get("piece_type", "unknown"), "): ", permanent_items.size(), " permanent items: ", permanent_items)
 				
 				if save_data.has("available_items"):
 					available_items = save_data["available_items"]
+					print("Loaded available items: ", available_items)
 				
 				print("Loadouts loaded successfully")
+				
+				# Save the migrated data
+				save_loadouts()
 			else:
 				print("Error parsing loadout save file")
 	else:
 		print("No loadout save file found - starting fresh")
+	print("=== LOADOUT LOADING COMPLETE ===")
 
 func get_item_effects_for_piece(instance_id: String, data_loader) -> Dictionary:
 	"""Get all active item effects for a piece instance (for applying to stats)"""

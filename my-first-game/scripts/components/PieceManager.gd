@@ -64,13 +64,32 @@ func create_piece(grid_pos: Vector2, color: Color, team: String, piece_type: Str
 	var piece_scene = preload("res://scenes/GamePiece.tscn")
 	var piece_instance = piece_scene.instantiate()
 	
-	# Generate unique ID for this piece instance
-	var piece_id = team + "_" + piece_type + "_" + str(grid_pos.x) + "_" + str(grid_pos.y) + "_" + str(randf())
-	piece_instance.piece_id = piece_id
+	# Generate unique but deterministic ID for this piece instance
+	# Use team_type_position format so same pieces at same positions get same IDs across restarts
+	var piece_id = team + "_" + piece_type + "_" + str(grid_pos.x) + "_" + str(grid_pos.y)
 	
-	# Set piece properties
-	piece_instance.team = team
-	piece_instance.piece_type = piece_type
+	# Check if the method exists before calling it
+	if piece_instance.has_method("set_piece_id"):
+		piece_instance.set_piece_id(piece_id)
+	else:
+		print("ERROR: GamePiece instance does not have set_piece_id method!")
+		print("Instance type: ", piece_instance.get_class())
+		print("Script: ", piece_instance.get_script())
+		print("Script is valid: ", piece_instance.get_script() != null)
+	
+	# Wait a frame to ensure script is fully loaded
+	await parent_node.get_tree().process_frame
+	
+	# Set piece properties - check if they're accessible
+	if "team" in piece_instance:
+		piece_instance.team = team
+	else:
+		print("ERROR: Cannot set team property on piece instance")
+		
+	if "piece_type" in piece_instance:
+		piece_instance.piece_type = piece_type
+	else:
+		print("ERROR: Cannot set piece_type property on piece instance")
 	piece_instance.position = grid_system.grid_to_world_pos(grid_pos) + Vector2(grid_system.TILE_SIZE/2, grid_system.TILE_SIZE/2)
 	piece_instance.set_grid_position(grid_pos)
 	
