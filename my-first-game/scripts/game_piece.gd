@@ -27,6 +27,9 @@ var available_attacks = [
 	{"name": "Quick Jab", "damage": 15, "range": 1, "description": "Fast attack with low damage"}
 ]
 
+# Store piece type data for attacks and abilities (from PieceFactory)
+var piece_type_data = null
+
 signal piece_died(piece)
 signal piece_damaged(piece, damage)
 
@@ -124,6 +127,20 @@ func set_selected(selected: bool):
 		$Border.color = Color.WHITE  # White border when selected
 	else:
 		setup_appearance()
+
+func set_piece_type_data(type_data):
+	"""Set piece type data from PieceFactory for attacks and abilities"""
+	piece_type_data = type_data
+	if type_data and type_data.available_attacks:
+		# Convert PieceType attacks to simple dictionary format
+		available_attacks = []
+		for attack_data in type_data.available_attacks:
+			available_attacks.append({
+				"name": attack_data.name,
+				"damage": attack_data.damage,
+				"range": attack_data.range,
+				"description": attack_data.description
+			})
 
 func take_damage(damage: int):
 	var original_damage = damage

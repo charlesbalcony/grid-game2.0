@@ -59,55 +59,40 @@ func _ready():
 	
 	# Initialize components
 	initialize_components()
-	
+
 	# Initialize high score manager
 	high_score_manager = HighScoreManager.new()
 	add_child(high_score_manager)
-	
+
 	# Connect to high score updates
 	high_score_manager.high_score_updated.connect(_on_high_score_updated)
-	
+
 	# Initialize glyph manager
 	glyph_manager = GlyphManager.new()
 	add_child(glyph_manager)
-	
+
 	# Connect to glyph updates
 	glyph_manager.glyphs_changed.connect(_on_glyphs_changed)
 	glyph_manager.glyph_reward.connect(_on_glyph_reward)
-	
+
 	# Initialize shop manager
 	shop_manager = ShopManager.new()
 	add_child(shop_manager)
-	
+
 	# Connect to shop events
 	shop_manager.item_purchased.connect(_on_item_purchased)
 	shop_manager.shop_closed.connect(_on_shop_closed)
-	
+
 	# Initialize loadout manager
 	loadout_manager = LoadoutManager.new()
 	add_child(loadout_manager)
-	
+
 	# Connect to loadout events
 	loadout_manager.item_equipped.connect(_on_item_equipped)
 	loadout_manager.item_unequipped.connect(_on_item_unequipped)
-	
-	# Sync loadout manager with shop manager inventory
-	if shop_manager:
-		var shop_inventory = shop_manager.get_inventory()  
-		for item in shop_inventory:
-			var item_id = item.get("id", "")
-			if item_id != "":
-				loadout_manager.add_available_item(item_id)
-	
-	# Set manager references in UI manager and connect signals
-	ui_manager.set_managers(glyph_manager, shop_manager, shop_manager.data_loader)
-	ui_manager.set_loadout_manager(loadout_manager)
-	ui_manager.end_run_to_shop_signal.connect(_on_end_run_to_shop)
-	ui_manager.shop_closed_signal.connect(_on_shop_closed_from_ui)
-	ui_manager.start_new_run_signal.connect(_on_start_new_run)
-	ui_manager.loadout_complete_signal.connect(_on_loadout_complete)
-	
-	# Get references to game manager and UI elements  
+
+	# Setup UI manager connections now that all managers are initialized
+	setup_ui_manager_connections()	# Get references to game manager and UI elements  
 	game_manager = get_node("GameManager")
 	turn_label = get_node("UI/TurnDisplay/TurnLabel")
 	end_turn_button = get_node("UI/TurnDisplay/EndTurnButton")
@@ -211,6 +196,42 @@ func initialize_components():
 		ai_system.set_difficulty_mode("medium")
 	
 	print("AI system initialized: ", ai_system)
+	
+	# Setup UI manager connections now that all managers are initialized
+	setup_ui_manager_connections()
+
+func setup_ui_manager_connections():
+	"""Setup UI manager connections after all managers are initialized"""
+	if not ui_manager:
+		print("ERROR: ui_manager is null when trying to setup connections")
+		return
+		
+	# Sync loadout manager with shop manager inventory
+	if shop_manager and loadout_manager:
+		var shop_inventory = shop_manager.get_inventory()  
+		for item in shop_inventory:
+			var item_id = item.get("id", "")
+			if item_id != "":
+				loadout_manager.add_available_item(item_id)
+	
+	# Set manager references in UI manager and connect signals
+	if ui_manager and shop_manager and shop_manager.data_loader:
+		ui_manager.set_managers(glyph_manager, shop_manager, shop_manager.data_loader)
+	else:
+		print("WARNING: Cannot set UI managers - missing references")
+		if not ui_manager:
+			print("  - ui_manager is null")
+		if not shop_manager:
+			print("  - shop_manager is null")
+		elif not shop_manager.data_loader:
+			print("  - shop_manager.data_loader is null")
+	
+	if ui_manager and loadout_manager:
+		ui_manager.set_loadout_manager(loadout_manager)
+		ui_manager.end_run_to_shop_signal.connect(_on_end_run_to_shop)
+		ui_manager.shop_closed_signal.connect(_on_shop_closed_from_ui)
+		ui_manager.start_new_run_signal.connect(_on_start_new_run)
+		ui_manager.loadout_complete_signal.connect(_on_loadout_complete)
 
 func get_selected_piece():
 	"""Get the currently selected piece from piece manager"""
@@ -680,9 +701,14 @@ func _on_shop_closed():
 
 func _on_end_run_to_shop():
 	"""Handle when player chooses to end run and go to shop"""
-	print("Player chose to end run and go to shop")
+	print("GameBoard._on_end_run_to_shop() called!")
+	print("UI manager exists: ", ui_manager != null)
 	if ui_manager:
+		print("Calling ui_manager.show_shop()...")
 		ui_manager.show_shop()
+		print("show_shop() call completed")
+	else:
+		print("ERROR: ui_manager is null!")
 
 func _on_shop_closed_from_ui():
 	"""Handle when shop is closed from UI"""

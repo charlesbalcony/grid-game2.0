@@ -4,6 +4,10 @@
 class_name PieceManager
 extends Node2D
 
+# Preload factory classes
+const PieceFactory = preload("res://scripts/factories/PieceFactory.gd")
+const ItemFactory = preload("res://scripts/factories/ItemFactory.gd")
+
 # Piece colors
 const PLAYER_COLOR = Color(0.2, 0.6, 1.0)
 const ENEMY_COLOR = Color(1.0, 0.3, 0.2)
@@ -16,12 +20,19 @@ var selection_highlight = null
 var parent_node = null
 var grid_system = null
 
+# Factory instances for data-driven piece creation
+var piece_factory: PieceFactory
+var item_factory: ItemFactory
+
 signal piece_selected(piece_data, position)
 signal piece_moved(from_pos, to_pos)
 signal piece_died(piece)
 
 func _init():
-	pass
+	# Initialize factories
+	piece_factory = PieceFactory.new()
+	item_factory = ItemFactory.new()
+	print("PieceManager: Initialized factories")
 
 func set_parent_node(node: Node2D):
 	"""Set reference to the parent node"""
@@ -93,19 +104,32 @@ func create_piece(grid_pos: Vector2, color: Color, team: String, piece_type: Str
 	piece_instance.position = grid_system.grid_to_world_pos(grid_pos) + Vector2(grid_system.TILE_SIZE/2, grid_system.TILE_SIZE/2)
 	piece_instance.set_grid_position(grid_pos)
 	
-	# Configure piece based on type
-	if piece_type == "king":
-		# Kings have different stats
-		piece_instance.max_health = 120
-		piece_instance.current_health = 120
-		piece_instance.attack_power = 35
-		piece_instance.defense = 10
+	# Configure piece stats using PieceFactory data-driven approach
+	var piece_type_data = piece_factory.create_piece_type(piece_type)
+	if piece_type_data:
+		piece_instance.max_health = piece_type_data.max_health
+		piece_instance.current_health = piece_type_data.max_health
+		piece_instance.attack_power = piece_type_data.base_attack_power
+		piece_instance.defense = piece_type_data.base_defense
+		
+		# Store piece type data for attack handling
+		if piece_instance.has_method("set_piece_type_data"):
+			piece_instance.set_piece_type_data(piece_type_data)
+		
+		print("Created ", piece_type, " with stats from factory - HP:", piece_instance.max_health, " ATK:", piece_instance.attack_power, " DEF:", piece_instance.defense)
 	else:
-		# Default warrior stats
-		piece_instance.max_health = 100
-		piece_instance.current_health = 100
-		piece_instance.attack_power = 25
-		piece_instance.defense = 0
+		# Fallback to hardcoded values
+		print("WARNING: Failed to create piece type from factory, using hardcoded values")
+		if piece_type == "king":
+			piece_instance.max_health = 120
+			piece_instance.current_health = 120
+			piece_instance.attack_power = 35
+			piece_instance.defense = 10
+		else:
+			piece_instance.max_health = 100
+			piece_instance.current_health = 100
+			piece_instance.attack_power = 25
+			piece_instance.defense = 0
 	
 	# Apply army modifiers for enemy pieces
 	if team == "enemy":

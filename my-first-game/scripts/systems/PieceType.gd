@@ -4,6 +4,9 @@ class_name PieceType
 # Base class for different piece types
 # This allows easy creation of different units like Warriors, Archers, Mages, etc.
 
+# Preload AttackData class
+const AttackData = preload("res://scripts/systems/AttackData.gd")
+
 @export var type_name: String = "Warrior"
 @export var max_health: int = 100
 @export var base_attack_power: int = 25
@@ -18,7 +21,7 @@ enum MovementType {
 }
 
 # Available attacks for this piece type
-@export var available_attacks: Array[AttackData] = []
+@export var available_attacks: Array = []
 
 func _init():
 	# Default warrior attacks

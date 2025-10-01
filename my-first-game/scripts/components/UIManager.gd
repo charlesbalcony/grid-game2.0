@@ -701,9 +701,14 @@ func update_turn_display(game_manager = null):
 
 func show_game_over(winner: String, reason: String = "elimination"):
 	"""Show game over screen"""
+	print("UIManager.show_game_over called with winner: ", winner, " reason: ", reason)
+	print("Parent node exists: ", parent_node != null)
+	
 	if not parent_node:
+		print("ERROR: parent_node is null in show_game_over!")
 		return
 	
+	print("Creating game over screen...")
 	# Clear any existing game over screen
 	clear_game_over()
 	
@@ -719,15 +724,15 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	
 	# Create game over overlay
 	game_over_overlay = ColorRect.new()
-	game_over_overlay.color = Color(0, 0, 0, 0.8)
+	game_over_overlay.color = Color(0, 0, 0, 0.9)  # More opaque to be more visible
 	game_over_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	game_over_overlay.z_index = 10
+	game_over_overlay.z_index = 100  # Very high z-index to ensure visibility
 	
 	# Create game over panel
 	var panel = Panel.new()
-	panel.size = Vector2(400, 200)
-	panel.position = Vector2(200, 150)
-	panel.z_index = 11
+	panel.size = Vector2(500, 300)  # Larger size to be more visible
+	panel.position = Vector2(150, 100)  # Centered position
+	panel.z_index = 101  # Higher than overlay
 	
 	var vbox = VBoxContainer.new()
 	vbox.position = Vector2(20, 20)
@@ -770,6 +775,7 @@ func show_game_over(winner: String, reason: String = "elimination"):
 		shop_button.text = "End Run & Shop"
 		shop_button.size = Vector2(150, 40)
 		shop_button.pressed.connect(func():
+			print("Shop button clicked!")
 			clear_game_over()
 			end_run_to_shop()
 		)
@@ -790,6 +796,13 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	
 	# Add to scene
 	parent_node.get_parent().add_child(game_over_overlay)
+	print("Game over screen added to scene successfully!")
+	print("Shop button should be visible for winner: ", winner)
+	print("Game over overlay parent: ", game_over_overlay.get_parent())
+	print("Game over overlay z_index: ", game_over_overlay.z_index)
+	print("Panel z_index: ", panel.z_index)
+	print("Panel position: ", panel.position)
+	print("Panel size: ", panel.size)
 
 func clear_game_over():
 	"""Clear any existing game over screen"""
@@ -867,7 +880,9 @@ func show_piece_info(grid_pos: Vector2):
 # Shop-related functions
 func end_run_to_shop():
 	"""End run and open shop"""
+	print("UIManager.end_run_to_shop() called - emitting signal")
 	end_run_to_shop_signal.emit()
+	print("Signal emitted successfully")
 
 func clear_any_overlays():
 	"""Clear any active overlays"""
@@ -933,6 +948,10 @@ func create_overlay():
 
 func show_shop():
 	"""Display the shop interface"""
+	print("UIManager.show_shop() called!")
+	print("glyph_manager exists: ", glyph_manager != null)
+	print("shop_manager exists: ", shop_manager != null)
+	
 	clear_any_overlays()
 	
 	var overlay_data = create_overlay()

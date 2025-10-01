@@ -50,12 +50,38 @@ func load_items() -> Array:
 	var data = load_json_file("res://data/items.json")
 	return data.get("items", [])
 
+func load_pieces() -> Array:
+	"""Load piece definitions from JSON"""
+	var data = load_json_file("res://data/pieces.json")
+	return data.get("pieces", [])
+
+func load_armies() -> Array:
+	"""Load army definitions from JSON"""
+	var data = load_json_file("res://data/armies.json")
+	return data.get("armies", [])
+
 func get_item_by_id(item_id: String) -> Dictionary:
 	"""Get a specific item by its ID"""
 	var items = load_items()
 	for item in items:
 		if item.get("id", "") == item_id:
 			return item
+	return {}
+
+func get_piece_by_id(piece_id: String) -> Dictionary:
+	"""Get a specific piece by its ID"""
+	var pieces = load_pieces()
+	for piece in pieces:
+		if piece.get("id", "") == piece_id:
+			return piece
+	return {}
+
+func get_army_by_id(army_id: String) -> Dictionary:
+	"""Get a specific army by its ID"""
+	var armies = load_armies()
+	for army in armies:
+		if army.get("id", "") == army_id:
+			return army
 	return {}
 
 func clear_cache():

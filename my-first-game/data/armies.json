@@ -1,0 +1,147 @@
+{
+  "armies": [
+    {
+      "id": "militia",
+      "name": "Militia",
+      "level": 1,
+      "description": "A basic militia force with standard warriors",
+      "health_multiplier": 1.0,
+      "damage_multiplier": 1.0,
+      "defense_bonus": 0,
+      "composition": {
+        "warrior": 15,
+        "king": 1
+      },
+      "formation": {
+        "preferred_layout": "defensive",
+        "special_positions": {
+          "king": [{"x": 3, "y": 0}]
+        }
+      },
+      "special_abilities": []
+    },
+    {
+      "id": "veteran_army",
+      "name": "Veteran Army",
+      "level": 2,
+      "description": "Experienced soldiers with improved tactics",
+      "health_multiplier": 1.2,
+      "damage_multiplier": 1.1,
+      "defense_bonus": 2,
+      "composition": {
+        "warrior": 14,
+        "archer": 1,
+        "king": 1
+      },
+      "formation": {
+        "preferred_layout": "balanced",
+        "special_positions": {
+          "king": [{"x": 3, "y": 0}],
+          "archer": [{"x": 2, "y": 0}]
+        }
+      },
+      "special_abilities": [
+        "coordinated_attack"
+      ]
+    },
+    {
+      "id": "elite_army",
+      "name": "Elite Army",
+      "level": 3,
+      "description": "Elite forces with mixed unit types",
+      "health_multiplier": 1.4,
+      "damage_multiplier": 1.3,
+      "defense_bonus": 5,
+      "composition": {
+        "warrior": 12,
+        "archer": 2,
+        "mage": 1,
+        "king": 1
+      },
+      "formation": {
+        "preferred_layout": "advanced",
+        "special_positions": {
+          "king": [{"x": 3, "y": 0}],
+          "mage": [{"x": 4, "y": 0}],
+          "archer": [{"x": 2, "y": 0}, {"x": 5, "y": 0}]
+        }
+      },
+      "special_abilities": [
+        "coordinated_attack",
+        "magical_support"
+      ]
+    },
+    {
+      "id": "royal_army",
+      "name": "Royal Army",
+      "level": 4,
+      "description": "The king's personal army - formidable and dangerous",
+      "health_multiplier": 1.6,
+      "damage_multiplier": 1.5,
+      "defense_bonus": 8,
+      "composition": {
+        "warrior": 10,
+        "archer": 3,
+        "mage": 2,
+        "king": 1
+      },
+      "formation": {
+        "preferred_layout": "royal_guard",
+        "special_positions": {
+          "king": [{"x": 3, "y": 0}],
+          "mage": [{"x": 2, "y": 0}, {"x": 4, "y": 0}],
+          "archer": [{"x": 1, "y": 0}, {"x": 3, "y": 1}, {"x": 5, "y": 0}]
+        }
+      },
+      "special_abilities": [
+        "coordinated_attack",
+        "magical_support",
+        "royal_guard_formation"
+      ]
+    }
+  ],
+  "army_abilities": {
+    "coordinated_attack": {
+      "name": "Coordinated Attack",
+      "description": "Units gain +5 attack when adjacent to allies",
+      "effect": {
+        "type": "conditional_bonus",
+        "condition": "adjacent_allies",
+        "stat_bonus": {
+          "attack_power": 5
+        }
+      }
+    },
+    "magical_support": {
+      "name": "Magical Support",
+      "description": "Mages provide +10 magic resistance to adjacent allies",
+      "effect": {
+        "type": "aura",
+        "source_type": "mage",
+        "target_type": "adjacent_allies",
+        "resistance_bonus": {
+          "magic": 10
+        }
+      }
+    },
+    "royal_guard_formation": {
+      "name": "Royal Guard Formation",
+      "description": "Units within 2 tiles of the King gain +3 defense",
+      "effect": {
+        "type": "aura",
+        "source_type": "king",
+        "range": 2,
+        "target_type": "allies",
+        "stat_bonus": {
+          "defense": 3
+        }
+      }
+    }
+  },
+  "scaling_rules": {
+    "health_per_level": 0.1,
+    "damage_per_level": 0.08,
+    "defense_per_level": 1,
+    "max_level_multiplier": 3.0
+  }
+}

@@ -16,7 +16,7 @@ class_name Army
 @export var defense_bonus: int = 0
 
 # Special army abilities or behaviors
-@export var special_abilities: Array[String] = []
+@export var special_abilities: Array = []
 
 func _init():
 	pass

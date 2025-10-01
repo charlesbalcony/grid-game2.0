@@ -1,0 +1,273 @@
+{
+  "pieces": [
+    {
+      "id": "warrior",
+      "name": "Warrior",
+      "description": "Balanced melee fighter with strong defense",
+      "max_health": 100,
+      "base_attack_power": 25,
+      "base_defense": 5,
+      "movement_range": 1,
+      "movement_type": "walking",
+      "sprite_icon": "♗",
+      "attacks": [
+        {
+          "id": "basic_attack",
+          "name": "Basic Attack",
+          "damage": 25,
+          "range": 1,
+          "accuracy": 0.8,
+          "description": "Standard melee attack",
+          "attack_type": "melee",
+          "area_of_effect": false,
+          "cooldown": 0
+        },
+        {
+          "id": "heavy_strike",
+          "name": "Heavy Strike",
+          "damage": 40,
+          "range": 1,
+          "accuracy": 0.6,
+          "description": "Powerful attack with high damage",
+          "attack_type": "melee",
+          "area_of_effect": false,
+          "cooldown": 1
+        },
+        {
+          "id": "quick_jab",
+          "name": "Quick Jab",
+          "damage": 15,
+          "range": 1,
+          "accuracy": 0.9,
+          "description": "Fast attack with low damage",
+          "attack_type": "melee",
+          "area_of_effect": false,
+          "cooldown": 0
+        }
+      ],
+      "passive_abilities": [],
+      "resistances": {
+        "melee": 0,
+        "ranged": 0,
+        "magic": 0
+      }
+    },
+    {
+      "id": "king",
+      "name": "King",
+      "description": "Powerful leader unit with royal abilities",
+      "max_health": 120,
+      "base_attack_power": 35,
+      "base_defense": 10,
+      "movement_range": 1,
+      "movement_type": "walking",
+      "sprite_icon": "♔",
+      "attacks": [
+        {
+          "id": "royal_strike",
+          "name": "Royal Strike",
+          "damage": 35,
+          "range": 1,
+          "accuracy": 0.85,
+          "description": "Majestic attack with moderate damage",
+          "attack_type": "melee",
+          "area_of_effect": false,
+          "cooldown": 0
+        },
+        {
+          "id": "commanding_blow",
+          "name": "Commanding Blow",
+          "damage": 45,
+          "range": 1,
+          "accuracy": 0.7,
+          "description": "Powerful royal attack",
+          "attack_type": "melee",
+          "area_of_effect": false,
+          "cooldown": 1
+        },
+        {
+          "id": "defensive_strike",
+          "name": "Defensive Strike",
+          "damage": 25,
+          "range": 1,
+          "accuracy": 0.95,
+          "description": "Careful attack with high accuracy",
+          "attack_type": "melee",
+          "area_of_effect": false,
+          "cooldown": 0
+        }
+      ],
+      "passive_abilities": [
+        {
+          "id": "royal_presence",
+          "name": "Royal Presence",
+          "description": "Adjacent allies gain +5 defense",
+          "effect": {
+            "type": "aura",
+            "range": 1,
+            "stat_bonus": {
+              "defense": 5
+            }
+          }
+        }
+      ],
+      "resistances": {
+        "melee": 5,
+        "ranged": 5,
+        "magic": 5
+      }
+    },
+    {
+      "id": "archer",
+      "name": "Archer",
+      "description": "Ranged fighter with high mobility",
+      "max_health": 80,
+      "base_attack_power": 20,
+      "base_defense": 3,
+      "movement_range": 2,
+      "movement_type": "walking",
+      "sprite_icon": "♖",
+      "attacks": [
+        {
+          "id": "bow_shot",
+          "name": "Bow Shot",
+          "damage": 25,
+          "range": 3,
+          "accuracy": 0.85,
+          "description": "Standard ranged attack",
+          "attack_type": "ranged",
+          "area_of_effect": false,
+          "cooldown": 0
+        },
+        {
+          "id": "power_shot",
+          "name": "Power Shot",
+          "damage": 35,
+          "range": 4,
+          "accuracy": 0.7,
+          "description": "Powerful long-range shot",
+          "attack_type": "ranged",
+          "area_of_effect": false,
+          "cooldown": 2
+        },
+        {
+          "id": "quick_shot",
+          "name": "Quick Shot",
+          "damage": 15,
+          "range": 2,
+          "accuracy": 0.95,
+          "description": "Fast accurate shot",
+          "attack_type": "ranged",
+          "area_of_effect": false,
+          "cooldown": 0
+        }
+      ],
+      "passive_abilities": [],
+      "resistances": {
+        "melee": -5,
+        "ranged": 0,
+        "magic": 0
+      }
+    },
+    {
+      "id": "mage",
+      "name": "Mage",
+      "description": "Magical support unit with healing and area attacks",
+      "max_health": 70,
+      "base_attack_power": 30,
+      "base_defense": 2,
+      "movement_range": 1,
+      "movement_type": "walking",
+      "sprite_icon": "♕",
+      "attacks": [
+        {
+          "id": "magic_missile",
+          "name": "Magic Missile",
+          "damage": 20,
+          "range": 2,
+          "accuracy": 0.95,
+          "description": "Magical projectile that never misses",
+          "attack_type": "magic",
+          "area_of_effect": false,
+          "cooldown": 0
+        },
+        {
+          "id": "fireball",
+          "name": "Fireball",
+          "damage": 30,
+          "range": 2,
+          "accuracy": 0.8,
+          "description": "Explosive magical attack",
+          "attack_type": "magic",
+          "area_of_effect": true,
+          "cooldown": 2
+        },
+        {
+          "id": "heal",
+          "name": "Heal",
+          "damage": -25,
+          "range": 2,
+          "accuracy": 1.0,
+          "description": "Restore ally health",
+          "attack_type": "heal",
+          "area_of_effect": false,
+          "cooldown": 1
+        }
+      ],
+      "passive_abilities": [
+        {
+          "id": "mana_regeneration",
+          "name": "Mana Regeneration",
+          "description": "Reduces cooldowns by 1 each turn",
+          "effect": {
+            "type": "cooldown_reduction",
+            "value": 1
+          }
+        }
+      ],
+      "resistances": {
+        "melee": -10,
+        "ranged": -5,
+        "magic": 10
+      }
+    }
+  ],
+  "movement_types": {
+    "walking": {
+      "name": "Walking",
+      "description": "Normal movement, blocked by other pieces",
+      "can_pass_through_units": false,
+      "can_pass_through_terrain": false
+    },
+    "flying": {
+      "name": "Flying",
+      "description": "Can move over other pieces",
+      "can_pass_through_units": true,
+      "can_pass_through_terrain": false
+    },
+    "teleport": {
+      "name": "Teleport",
+      "description": "Can move to any valid position within range",
+      "can_pass_through_units": true,
+      "can_pass_through_terrain": true
+    }
+  },
+  "attack_types": {
+    "melee": {
+      "name": "Melee",
+      "description": "Close combat physical attack"
+    },
+    "ranged": {
+      "name": "Ranged",
+      "description": "Long distance physical attack"
+    },
+    "magic": {
+      "name": "Magic",
+      "description": "Magical damage attack"
+    },
+    "heal": {
+      "name": "Heal",
+      "description": "Restores health to target"
+    }
+  }
+}
