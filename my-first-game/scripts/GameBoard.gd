@@ -474,11 +474,19 @@ func _on_game_over(winner: String, reason: String = "elimination"):
 	if ai_system:
 		ai_system.set_process(false)
 	
+	# Check for glyph recovery BEFORE showing game over screen
+	var glyphs_recovered = 0
+	if winner.to_lower() == "player" and glyph_manager and army_manager:
+		var completed_level = army_manager.get_current_level()
+		if glyph_manager.get_stuck_glyphs() > 0 and completed_level >= glyph_manager.get_stuck_at_level():
+			glyphs_recovered = glyph_manager.get_stuck_glyphs()
+			print("Player will recover ", glyphs_recovered, " glyphs!")
+	
 	# Don't advance army here - wait for player to click restart
 	# The army advancement will happen in restart_battle() when appropriate
 	
-	# Show game over UI
-	ui_manager.show_game_over(winner, reason)
+	# Show game over UI with glyph recovery info
+	ui_manager.show_game_over(winner, reason, glyphs_recovered)
 
 func _on_end_turn_pressed():
 	print("End turn button pressed")

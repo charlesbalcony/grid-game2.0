@@ -699,9 +699,9 @@ func update_turn_display(game_manager = null):
 			player_indicator.modulate = Color(0.5, 0.5, 0.5)
 			enemy_indicator.modulate = Color.WHITE
 
-func show_game_over(winner: String, reason: String = "elimination"):
+func show_game_over(winner: String, reason: String = "elimination", glyphs_recovered: int = 0):
 	"""Show game over screen"""
-	print("UIManager.show_game_over called with winner: ", winner, " reason: ", reason)
+	print("UIManager.show_game_over called with winner: ", winner, " reason: ", reason, " glyphs_recovered: ", glyphs_recovered)
 	print("Parent node exists: ", parent_node != null)
 	
 	if not parent_node:
@@ -748,10 +748,18 @@ func show_game_over(winner: String, reason: String = "elimination"):
 	# Winner announcement
 	var winner_label = Label.new()
 	if winner.to_lower() == "player":
+		var victory_text = ""
 		if reason == "king_death":
-			winner_label.text = "VICTORY!\nYou defeated the enemy King!" + army_info + "\n\nNext: Harder enemies await!"
+			victory_text = "VICTORY!\nYou defeated the enemy King!" + army_info
 		else:
-			winner_label.text = "VICTORY!\nYou defeated all enemies!" + army_info + "\n\nNext: Harder enemies await!"
+			victory_text = "VICTORY!\nYou defeated all enemies!" + army_info
+		
+		# Add glyph recovery message if applicable
+		if glyphs_recovered > 0:
+			victory_text += "\n\n🎉 GLYPHS RECOVERED! 🎉\nYou reclaimed " + str(glyphs_recovered) + " lost glyphs!"
+		
+		victory_text += "\n\nNext: Harder enemies await!"
+		winner_label.text = victory_text
 		winner_label.modulate = Color.GREEN
 	else:
 		if reason == "king_death":
