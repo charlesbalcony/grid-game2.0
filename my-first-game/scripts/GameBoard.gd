@@ -249,6 +249,9 @@ func setup_board():
 	
 	# Setup pieces
 	piece_manager.setup_pieces()
+	
+	# Apply battle start effects after initial piece setup
+	call_deferred("apply_battle_start_effects")
 
 func _input(event):
 	# Let the InputHandler process input directly since it's in the scene tree
@@ -573,6 +576,10 @@ func restart_battle(winner: String = ""):
 	print("Setting up new pieces...")
 	piece_manager.setup_pieces()
 	
+	# Apply battle start effects after pieces are set up
+	print("Applying battle start effects...")
+	apply_battle_start_effects()
+	
 	# Re-enable AI processing
 	if ai_system and is_instance_valid(ai_system):
 		ai_system.set_process(true)
@@ -626,6 +633,10 @@ func restart_battle_without_progression():
 	# Re-setup pieces with current army stats
 	print("Setting up new pieces...")
 	piece_manager.setup_pieces()
+	
+	# Apply battle start effects after pieces are set up
+	print("Applying battle start effects...")
+	apply_battle_start_effects()
 	
 	# Re-enable AI processing
 	if ai_system and is_instance_valid(ai_system):
@@ -765,6 +776,42 @@ func refresh_piece_item_effects():
 			var piece_data = piece_manager.pieces[pos]
 			if piece_data.has("piece_node") and piece_data.piece_node.has_method("refresh_item_effects"):
 				piece_data.piece_node.refresh_item_effects()
+
+func apply_battle_start_effects():
+	"""Apply battle start effects to all pieces with equipped items"""
+	if not piece_manager:
+		return
+	
+	print("=== APPLYING BATTLE START EFFECTS ===")
+	
+	# Create an ItemFactory instance to handle the effects
+	var item_factory = preload("res://scripts/factories/ItemFactory.gd").new()
+	
+	for pos in piece_manager.pieces.keys():
+		var piece_data = piece_manager.pieces[pos]
+		if not piece_data.has("piece_node"):
+			continue
+			
+		var piece_node = piece_data.piece_node
+		var piece_id = piece_node.piece_id if piece_node.has_method("get") else ""
+		
+		if piece_id == "":
+			continue
+		
+		# Get equipped items for this piece
+		if loadout_manager:
+			var equipped_items = loadout_manager.get_equipped_items(piece_id)
+			print("Checking battle start effects for piece ", piece_id, " with ", equipped_items.size(), " items")
+			
+			for item_id in equipped_items:
+				# Apply battle start effects specifically
+				item_factory.apply_item_effect(piece_node, item_id, "battle_start")
+		
+		# Update health bar in case health was modified
+		if piece_node.has_method("update_health_bar"):
+			piece_node.update_health_bar()
+	
+	print("=== BATTLE START EFFECTS COMPLETE ===")
 
 func get_loadout_manager():
 	"""Get reference to the loadout manager"""

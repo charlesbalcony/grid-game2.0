@@ -271,6 +271,43 @@ func show_attack_options(piece_data):
 	# Wait a frame for cleanup
 	await get_tree().process_frame
 	
+	# Add health display
+	var health_container = HBoxContainer.new()
+	health_container.add_theme_constant_override("separation", 5)
+	
+	# Health label
+	var health_label = Label.new()
+	health_label.text = "HP: " + str(piece_node.current_health) + "/" + str(piece_node.max_health)
+	health_label.add_theme_font_size_override("font_size", 12)
+	health_label.add_theme_color_override("font_color", Color.WHITE)
+	health_container.add_child(health_label)
+	
+	# Health bar
+	var health_bar_bg = ColorRect.new()
+	health_bar_bg.size = Vector2(120, 12)
+	health_bar_bg.color = Color(0.2, 0.2, 0.2)
+	health_container.add_child(health_bar_bg)
+	
+	var health_bar = ColorRect.new()
+	var health_percentage = float(piece_node.current_health) / float(piece_node.max_health)
+	health_bar.size = Vector2(118 * health_percentage, 10)
+	health_bar.position = Vector2(1, 1)
+	
+	# Color based on health percentage
+	if health_percentage > 0.6:
+		health_bar.color = Color(0.0, 0.8, 0.0)  # Green
+	elif health_percentage > 0.3:
+		health_bar.color = Color(0.8, 0.8, 0.0)  # Yellow
+	else:
+		health_bar.color = Color(0.8, 0.0, 0.0)  # Red
+	
+	health_bar_bg.add_child(health_bar)
+	vbox.add_child(health_container)
+	
+	# Add separator after health
+	var health_separator = HSeparator.new()
+	vbox.add_child(health_separator)
+	
 	# Add attack buttons
 	for i in range(attacks.size()):
 		var attack = attacks[i]
