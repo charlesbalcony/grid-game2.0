@@ -737,118 +737,127 @@ func update_turn_display(game_manager = null):
 			enemy_indicator.modulate = Color.WHITE
 
 func show_game_over(winner: String, reason: String = "elimination", glyphs_recovered: int = 0):
-	"""Show game over screen"""
-	print("UIManager.show_game_over called with winner: ", winner, " reason: ", reason, " glyphs_recovered: ", glyphs_recovered)
-	print("Parent node exists: ", parent_node != null)
+	"""Show game over screen as an overlay"""
+	print("UIManager: Showing game over overlay")
+	print("Winner: ", winner, " Reason: ", reason, " Glyphs recovered: ", glyphs_recovered)
 	
-	if not parent_node:
-		print("ERROR: parent_node is null in show_game_over!")
-		return
-	
-	print("Creating game over screen...")
 	# Clear any existing game over screen
 	clear_game_over()
 	
 	# Get current army info if available
 	var army_info = ""
-	var game_board = parent_node
-	if game_board and game_board.has_method("get_army_manager"):
-		var army_manager = game_board.get_army_manager()
+	if parent_node and parent_node.has_method("get_army_manager"):
+		var army_manager = parent_node.get_army_manager()
 		if army_manager:
 			var current_army = army_manager.get_current_army()
 			if current_army:
 				army_info = "\nLevel " + str(current_army.level) + ": " + current_army.army_name
 	
-	# Create game over overlay
+	# Create fullscreen overlay
 	game_over_overlay = ColorRect.new()
-	game_over_overlay.color = Color(0, 0, 0, 0.9)  # More opaque to be more visible
+	game_over_overlay.color = Color(0, 0, 0, 0.9)
 	game_over_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	game_over_overlay.z_index = 100  # Very high z-index to ensure visibility
+	game_over_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	game_over_overlay.z_index = 100
 	
-	# Create game over panel
+	# Add to parent scene
+	if parent_node:
+		parent_node.add_child(game_over_overlay)
+	
+	# Use CenterContainer for proper centering
+	var center = CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_over_overlay.add_child(center)
+	
+	# Create panel
 	var panel = Panel.new()
-	panel.size = Vector2(500, 300)  # Larger size to be more visible
-	panel.position = Vector2(150, 100)  # Centered position
-	panel.z_index = 101  # Higher than overlay
+	panel.custom_minimum_size = Vector2(500, 400)
+	center.add_child(panel)
 	
+	# Content container
 	var vbox = VBoxContainer.new()
-	vbox.position = Vector2(20, 20)
-	vbox.size = Vector2(360, 160)
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 15)
+	
+	var margin = MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 30)
+	margin.add_theme_constant_override("margin_right", 30)
+	margin.add_theme_constant_override("margin_top", 30)
+	margin.add_theme_constant_override("margin_bottom", 30)
+	panel.add_child(margin)
+	margin.add_child(vbox)
 	
 	# Title
 	var title = Label.new()
 	title.text = "GAME OVER!"
 	title.add_theme_font_size_override("font_size", 32)
+	title.add_theme_color_override("font_color", Color.RED)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 	
-	# Winner announcement
+	# Winner
 	var winner_label = Label.new()
 	if winner.to_lower() == "player":
-		var victory_text = ""
-		if reason == "king_death":
-			victory_text = "VICTORY!\nYou defeated the enemy King!" + army_info
-		else:
-			victory_text = "VICTORY!\nYou defeated all enemies!" + army_info
-		
-		# Add glyph recovery message if applicable
-		if glyphs_recovered > 0:
-			victory_text += "\n\n🎉 GLYPHS RECOVERED! 🎉\nYou reclaimed " + str(glyphs_recovered) + " lost glyphs!"
-		
-		victory_text += "\n\nNext: Harder enemies await!"
-		winner_label.text = victory_text
-		winner_label.modulate = Color.GREEN
+		winner_label.text = "VICTORY!" + army_info
+		winner_label.add_theme_color_override("font_color", Color.GREEN)
 	else:
-		if reason == "king_death":
-			winner_label.text = "DEFEAT\nYour King has fallen!" + army_info
-		else:
-			winner_label.text = "DEFEAT\nAll your pieces were destroyed!" + army_info
-		winner_label.modulate = Color.RED
-	
+		winner_label.text = "DEFEAT!" + army_info
+		winner_label.add_theme_color_override("font_color", Color.ORANGE)
 	winner_label.add_theme_font_size_override("font_size", 18)
 	winner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(winner_label)
 	
-	# Restart button
-	var restart_button = Button.new()
-	# Set button text based on winner
+	# Glyphs recovered
+	if glyphs_recovered > 0:
+		vbox.add_child(HSeparator.new())
+		var glyphs_label = Label.new()
+		glyphs_label.text = "Glyphs Recovered: " + str(glyphs_recovered)
+		glyphs_label.add_theme_color_override("font_color", Color.YELLOW)
+		glyphs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(glyphs_label)
+	
+	vbox.add_child(HSeparator.new())
+	
+	# Buttons
+	var button_container = VBoxContainer.new()
+	button_container.add_theme_constant_override("separation", 10)
+	button_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(button_container)
+	
 	if winner.to_lower() == "player":
-		restart_button.text = "Continue"  # Advancing to next army level
-		
-		# Add shop button for victories
-		var shop_button = Button.new()
-		shop_button.text = "End Run & Shop"
-		shop_button.size = Vector2(150, 40)
-		shop_button.pressed.connect(func():
-			print("Shop button clicked!")
+		# Continue button
+		var continue_btn = Button.new()
+		continue_btn.text = "Continue to Next Level"
+		continue_btn.custom_minimum_size = Vector2(200, 40)
+		continue_btn.pressed.connect(func():
 			clear_game_over()
-			end_run_to_shop()
+			if parent_node and parent_node.has_method("restart_battle"):
+				parent_node.restart_battle("player")
 		)
-		vbox.add_child(shop_button)
+		button_container.add_child(continue_btn)
 		
+		# Shop button
+		var shop_btn = Button.new()
+		shop_btn.text = "End Run & Visit Shop"
+		shop_btn.custom_minimum_size = Vector2(200, 40)
+		shop_btn.pressed.connect(func():
+			clear_game_over()
+			show_shop()
+		)
+		button_container.add_child(shop_btn)
 	else:
-		restart_button.text = "Play Again"  # Restarting at level 1
-	restart_button.size = Vector2(150, 40)
-	var game_winner = winner  # Capture winner in local scope
-	restart_button.pressed.connect(func(): 
-		clear_game_over()  # Clear the game over screen
-		restart_battle(game_winner)   # Pass winner info for army reset decision
-	)
-	vbox.add_child(restart_button)
+		# Restart button for defeat
+		var restart_btn = Button.new()
+		restart_btn.text = "Play Again"
+		restart_btn.custom_minimum_size = Vector2(200, 40)
+		restart_btn.pressed.connect(func():
+			clear_game_over()
+			if parent_node and parent_node.has_method("restart_battle"):
+				parent_node.restart_battle("enemy")
+		)
+		button_container.add_child(restart_btn)
 	
-	panel.add_child(vbox)
-	game_over_overlay.add_child(panel)
-	
-	# Add to scene
-	parent_node.get_parent().add_child(game_over_overlay)
-	print("Game over screen added to scene successfully!")
-	print("Shop button should be visible for winner: ", winner)
-	print("Game over overlay parent: ", game_over_overlay.get_parent())
-	print("Game over overlay z_index: ", game_over_overlay.z_index)
-	print("Panel z_index: ", panel.z_index)
-	print("Panel position: ", panel.position)
-	print("Panel size: ", panel.size)
-
 func clear_game_over():
 	"""Clear any existing game over screen"""
 	if game_over_overlay and is_instance_valid(game_over_overlay):
@@ -974,18 +983,25 @@ func create_overlay():
 	parent_node.add_child(background)
 	overlay_data.background = background
 	
-	# Create main panel
+	# Create a center container for proper centering
+	var center_container = CenterContainer.new()
+	center_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.add_child(center_container)
+	
+	# Create main panel (will be centered by CenterContainer)
 	var panel = Panel.new()
-	panel.size = Vector2(500, 400)
-	panel.position = Vector2(150, 100)
+	panel.custom_minimum_size = Vector2(500, 400)
 	panel.z_index = 11
-	background.add_child(panel)
+	center_container.add_child(panel)
 	overlay_data.panel = panel
 	
 	# Create content container
 	var vbox_container = VBoxContainer.new()
-	vbox_container.position = Vector2(20, 20)
-	vbox_container.size = Vector2(460, 360)
+	vbox_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox_container.add_theme_constant_override("margin_left", 20)
+	vbox_container.add_theme_constant_override("margin_right", 20)
+	vbox_container.add_theme_constant_override("margin_top", 20)
+	vbox_container.add_theme_constant_override("margin_bottom", 20)
 	panel.add_child(vbox_container)
 	overlay_data.vbox_container = vbox_container
 	
@@ -993,169 +1009,41 @@ func create_overlay():
 
 func show_shop():
 	"""Display the shop interface"""
-	print("UIManager.show_shop() called!")
-	print("glyph_manager exists: ", glyph_manager != null)
-	print("shop_manager exists: ", shop_manager != null)
+	print("UIManager: Transitioning to Shop scene")
 	
+	# Save current glyphs to GameState before changing scenes
+	if glyph_manager:
+		var current_glyphs = glyph_manager.get_current_glyphs()
+		GameState.current_glyphs = current_glyphs
+		print("UIManager: Saved ", current_glyphs, " glyphs to GameState")
+	
+	get_tree().change_scene_to_file("res://scenes/Shop.tscn")
+
+func show_loadout_menu():
+	"""Transition to the dedicated LoadoutMenu scene"""
+	print("UIManager: Transitioning to LoadoutMenu scene")
+	
+	# Store current scene info for returning
+	var current_scene = get_tree().current_scene
+	if current_scene:
+		# Store the scene path so we can return to it
+		var scene_path = current_scene.scene_file_path
+		print("Current scene path: ", scene_path)
+	
+	# Clear any existing overlays first
 	clear_any_overlays()
 	
-	var overlay_data = create_overlay()
-	shop_overlay = overlay_data.background
+	# Change to the LoadoutMenu scene directly
+	get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
 	
-	# Shop title
-	var title = Label.new()
-	title.text = "Mystic Shop"
-	title.add_theme_font_size_override("font_size", 24)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	overlay_data.vbox_container.add_child(title)
-	
-	# Get current glyphs
-	var current_glyphs = glyph_manager.get_current_glyphs()
-	var glyphs_label = Label.new()
-	glyphs_label.text = "Glyphs: " + str(current_glyphs)
-	glyphs_label.add_theme_font_size_override("font_size", 16)
-	glyphs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	overlay_data.vbox_container.add_child(glyphs_label)
-	
-	# Add separator
-	overlay_data.vbox_container.add_child(HSeparator.new())
-	
-	# Shop items container
-	var scroll_container = ScrollContainer.new()
-	scroll_container.custom_minimum_size = Vector2(400, 300)
-	var items_vbox = VBoxContainer.new()
-	scroll_container.add_child(items_vbox)
-	overlay_data.vbox_container.add_child(scroll_container)
-	
-	# Get shop items
-	var shop_items = shop_manager.get_shop_items()
-	
-	for item_data in shop_items:
-		if item_data:
-			var item_container = create_shop_item_display(item_data, current_glyphs)
-			items_vbox.add_child(item_container)
-	
-	# Buttons container
-	var buttons_container = HBoxContainer.new()
-	buttons_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	
-	# Start New Run button
-	var new_run_button = Button.new()
-	new_run_button.text = "Start New Run"
-	new_run_button.size = Vector2(140, 40)
-	new_run_button.pressed.connect(func():
-		start_new_run()
-	)
-	buttons_container.add_child(new_run_button)
-	
-	overlay_data.vbox_container.add_child(buttons_container)
-
-func create_shop_item_display(item_data: Dictionary, current_glyphs: int) -> Control:
-	"""Create a display for a single shop item"""
-	var item_container = HBoxContainer.new()
-	item_container.custom_minimum_size = Vector2(350, 50)
-	
-	# Item info container
-	var info_vbox = VBoxContainer.new()
-	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	
-	# Item name with rarity color
-	var name_label = Label.new()
-	name_label.text = item_data.name
-	name_label.add_theme_font_size_override("font_size", 14)
-	
-	# Set color based on rarity
-	var rarity_color = get_rarity_color(item_data.rarity)
-	name_label.add_theme_color_override("font_color", rarity_color)
-	
-	info_vbox.add_child(name_label)
-	
-	# Item description
-	var desc_label = Label.new()
-	desc_label.text = item_data.get("effect", "No description available")
-	desc_label.add_theme_font_size_override("font_size", 11)
-	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info_vbox.add_child(desc_label)
-	
-	item_container.add_child(info_vbox)
-	
-	# Cost and purchase button container
-	var purchase_vbox = VBoxContainer.new()
-	
-	# Cost label
-	var cost_label = Label.new()
-	cost_label.text = str(item_data.cost) + " Glyphs"
-	cost_label.add_theme_font_size_override("font_size", 12)
-	cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	purchase_vbox.add_child(cost_label)
-	
-	# Purchase button
-	var purchase_button = Button.new()
-	purchase_button.text = "Buy"
-	purchase_button.size = Vector2(60, 25)
-	
-	# Check if affordable
-	var can_afford = current_glyphs >= item_data.cost
-	purchase_button.disabled = not can_afford
-	
-	if can_afford:
-		purchase_button.pressed.connect(func():
-			purchase_item(item_data.get("id", "unknown"))
-		)
-	
-	purchase_vbox.add_child(purchase_button)
-	
-	item_container.add_child(purchase_vbox)
-	
-	return item_container
-
-func get_rarity_color(rarity: String) -> Color:
-	"""Get color for item rarity"""
-	match rarity.to_lower():
-		"common":
-			return Color.WHITE
-		"uncommon":
-			return Color.CYAN
-		"rare":
-			return Color.YELLOW
-		"epic":
-			return Color.MAGENTA
-		"legendary":
-			return Color.ORANGE
-		_:
-			return Color.WHITE
-
-func purchase_item(item_id: String):
-	"""Attempt to purchase an item"""
-	var current_glyphs = glyph_manager.get_current_glyphs()
-	var result = shop_manager.purchase_item(item_id, current_glyphs)
-	if result.get("success", false):
-		print("Purchase successful!")
-		# Refresh shop display
-		show_shop()
-	else:
-		print("Failed to purchase item: ", item_id, " - ", result.get("error", "Unknown error"))
-
-func close_shop():
-	"""Close the shop interface"""
-	if shop_overlay:
-		shop_overlay.queue_free()
-		shop_overlay = null
-		
-	# Emit signal to return to main menu or end run
-	shop_closed_signal.emit()
-
-func start_new_run():
-	"""Start a new run from the shop"""
-	if shop_overlay:
-		shop_overlay.queue_free()
-		shop_overlay = null
-	
-	# Emit signal to start new run
-	start_new_run_signal.emit()
+	print("UIManager: Scene changed to LoadoutMenu")
 
 func show_loadout_screen(screen_type: String):
-	"""Show the dedicated loadout screen with only player pieces in formation"""
+	"""Show the dedicated loadout screen with only player pieces in formation (DEPRECATED - use show_loadout_menu instead)"""
+	# Redirect to the new scene-based loadout menu
+	show_loadout_menu()
+	return
+	
 	clear_any_overlays()
 	
 	# Enable input blocking at the UIManager level

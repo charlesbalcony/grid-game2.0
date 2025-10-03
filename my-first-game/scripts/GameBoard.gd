@@ -45,6 +45,11 @@ var glyph_label = null
 var ai_timer = null  # Store AI timer to cancel if needed
 
 func _ready():
+	# Enforce fullscreen mode for consistent UI layout
+	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		print("Enforced fullscreen mode for consistent UI")
+	
 	# Add to game_board group so pieces can find us
 	add_to_group("game_board")
 	

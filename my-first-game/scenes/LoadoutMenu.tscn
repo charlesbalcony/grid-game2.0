@@ -1,0 +1,89 @@
+[gd_scene load_steps=2 format=3 uid="uid://bqx6n4mk4ehqe"]
+
+[ext_resource type="Script" path="res://scripts/LoadoutMenu.gd" id="1_0g8yb"]
+
+[node name="LoadoutMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_0g8yb")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.05, 0.05, 0.15, 0.98)
+
+[node name="MainContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="MainContainer"]
+layout_mode = 2
+text = "Army Loadout"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ContentContainer" type="HBoxContainer" parent="MainContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="FormationSection" type="VBoxContainer" parent="MainContainer/ContentContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FormationTitle" type="Label" parent="MainContainer/ContentContainer/FormationSection"]
+layout_mode = 2
+text = "Your Army Formation:"
+horizontal_alignment = 1
+
+[node name="FormationContainer" type="VBoxContainer" parent="MainContainer/ContentContainer/FormationSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LoadoutSection" type="VBoxContainer" parent="MainContainer/ContentContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LoadoutTitle" type="Label" parent="MainContainer/ContentContainer/LoadoutSection"]
+layout_mode = 2
+text = "Piece Equipment:"
+horizontal_alignment = 1
+
+[node name="LoadoutContainer" type="ScrollContainer" parent="MainContainer/ContentContainer/LoadoutSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LoadoutContent" type="VBoxContainer" parent="MainContainer/ContentContainer/LoadoutSection/LoadoutContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="MainContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="BackButton" type="Button" parent="MainContainer/ButtonsContainer"]
+layout_mode = 2
+text = "Back to Menu"
+custom_minimum_size = Vector2(150, 40)
+
+[node name="StartBattleButton" type="Button" parent="MainContainer/ButtonsContainer"]
+layout_mode = 2
+text = "Start Battle"
+custom_minimum_size = Vector2(150, 40)
