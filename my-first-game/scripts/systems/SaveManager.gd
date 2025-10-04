@@ -13,6 +13,7 @@ var current_save_data = {
 	"total_playtime": 0.0,
 	"glyphs": 0,
 	"permanent_items": [],
+	"piece_loadouts": {},  # Store permanent equipment (only permanent slot)
 	"high_scores": {
 		"classic": 0,
 		"endless": 0
@@ -162,6 +163,7 @@ func create_new_save(save_name: String) -> bool:
 		"total_playtime": 0.0,
 		"glyphs": 0,
 		"permanent_items": [],
+		"piece_loadouts": {},
 		"high_scores": {
 			"classic": 0,
 			"endless": 0
@@ -190,3 +192,20 @@ func set_high_score(mode: String, score: int):
 	if not current_save_data.has("high_scores"):
 		current_save_data["high_scores"] = {}
 	current_save_data["high_scores"][mode] = score
+
+func get_piece_loadouts() -> Dictionary:
+	return current_save_data.get("piece_loadouts", {})
+
+func set_piece_loadouts(loadouts: Dictionary):
+	# Only save permanent equipment to the save file
+	var permanent_loadouts = {}
+	for piece_id in loadouts.keys():
+		var piece_data = loadouts[piece_id]
+		if piece_data.has("permanent") and piece_data["permanent"].size() > 0:
+			# Only store pieces that have permanent items equipped
+			permanent_loadouts[piece_id] = {
+				"piece_type": piece_data.get("piece_type", ""),
+				"grid_position": piece_data.get("grid_position", Vector2.ZERO),
+				"permanent": piece_data["permanent"].duplicate()
+			}
+	current_save_data["piece_loadouts"] = permanent_loadouts

@@ -19,8 +19,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
-color = Color(0.0, 0.0, 0.0, 0.9)
+mouse_filter = 2
+color = Color(0.05, 0.05, 0.15, 1)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 1
@@ -32,7 +32,7 @@ grow_vertical = 2
 
 [node name="Panel" type="Panel" parent="CenterContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(500, 400)
+custom_minimum_size = Vector2(600, 500)
 
 [node name="MainContainer" type="VBoxContainer" parent="CenterContainer/Panel"]
 layout_mode = 1
@@ -67,10 +67,12 @@ alignment = 1
 
 [node name="ShopButton" type="Button" parent="CenterContainer/Panel/MainContainer/ButtonsContainer"]
 layout_mode = 2
+mouse_filter = 0
 text = "Visit Shop"
-custom_minimum_size = Vector2(120, 40)
+custom_minimum_size = Vector2(150, 50)
 
 [node name="NewGameButton" type="Button" parent="CenterContainer/Panel/MainContainer/ButtonsContainer"]
 layout_mode = 2
+mouse_filter = 0
 text = "New Game"
-custom_minimum_size = Vector2(120, 40)
+custom_minimum_size = Vector2(150, 50)

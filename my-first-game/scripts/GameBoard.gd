@@ -94,7 +94,12 @@ func _ready():
 	# Connect to loadout events
 	loadout_manager.item_equipped.connect(_on_item_equipped)
 	loadout_manager.item_unequipped.connect(_on_item_unequipped)
-
+	
+	# Load loadout data from GameState if it exists
+	if GameState and GameState.piece_loadouts.size() > 0:
+		loadout_manager.piece_loadouts = GameState.piece_loadouts.duplicate(true)
+		print("GameBoard: Loaded ", GameState.piece_loadouts.size(), " piece loadouts from GameState")
+	
 	# Setup UI manager connections now that all managers are initialized
 	setup_ui_manager_connections()	# Get references to game manager and UI elements  
 	game_manager = get_node("GameManager")
@@ -125,6 +130,13 @@ func _ready():
 	# Initialize current level from army_manager
 	if army_manager:
 		current_level = army_manager.get_current_level()
+	
+	# Load current level from GameState (in case we're returning from GameOver)
+	if GameState and GameState.current_level > 1:
+		print("GameBoard: Resuming at level ", GameState.current_level)
+		if army_manager:
+			army_manager.set_current_army(GameState.current_level)
+			current_level = GameState.current_level
 	
 	# Update high score display
 	update_high_score_display()
@@ -485,19 +497,67 @@ func _on_game_over(winner: String, reason: String = "elimination"):
 	if ai_system:
 		ai_system.set_process(false)
 	
+	# Get current level before any changes
+	var completed_level = army_manager.get_current_level() if army_manager else 1
+	
 	# Check for glyph recovery BEFORE showing game over screen
 	var glyphs_recovered = 0
-	if winner.to_lower() == "player" and glyph_manager and army_manager:
-		var completed_level = army_manager.get_current_level()
+	if winner.to_lower() == "player" and glyph_manager:
 		if glyph_manager.get_stuck_glyphs() > 0 and completed_level >= glyph_manager.get_stuck_at_level():
 			glyphs_recovered = glyph_manager.get_stuck_glyphs()
 			print("Player will recover ", glyphs_recovered, " glyphs!")
+		
+		# Check for glyph recovery when advancing
+		glyph_manager.check_glyph_recovery(completed_level)
 	
-	# Don't advance army here - wait for player to click restart
-	# The army advancement will happen in restart_battle() when appropriate
+	# Handle level progression
+	if winner.to_lower() == "player":
+		# Victory - advance to next level
+		var next_level = completed_level + 1
+		GameState.current_level = next_level
+		current_level = next_level
+		print("GameBoard: Player won! Next level will be: ", next_level)
+		
+		# Update high score if this is a new record
+		if GameState and GameState.save_manager:
+			var old_high_score = GameState.save_manager.get_high_score("classic")
+			if completed_level > old_high_score:
+				GameState.save_manager.set_high_score("classic", completed_level)
+				print("NEW HIGH SCORE! Reached Level ", completed_level)
+	else:
+		# Defeat - reset to level 1
+		GameState.current_level = 1
+		current_level = 1
+		print("GameBoard: Player defeated! Resetting to level 1")
+		
+		# Lose glyphs when defeated
+		if glyph_manager:
+			glyph_manager.lose_glyphs(completed_level)
 	
-	# Show game over UI with glyph recovery info
-	ui_manager.show_game_over(winner, reason, glyphs_recovered)
+	# Get army info
+	var army_info = ""
+	if army_manager:
+		var current_army = army_manager.get_current_army()
+		if current_army:
+			army_info = "Level " + str(current_army.level) + ": " + current_army.army_name
+	
+	# Sync glyphs to GameState before transitioning
+	if glyph_manager:
+		GameState.current_glyphs = glyph_manager.get_current_glyphs()
+	
+	# Save loadout data to GameState (so equipment persists)
+	if loadout_manager:
+		GameState.piece_loadouts = loadout_manager.piece_loadouts.duplicate(true)
+		print("GameBoard: Saved ", GameState.piece_loadouts.size(), " piece loadouts to GameState")
+	
+	# Store game over data in GameState
+	GameState.set_game_over_data(winner, reason, glyphs_recovered, army_info)
+	
+	# Save current progress
+	GameState.save_current()
+	
+	# Transition to GameOver scene
+	get_tree().change_scene_to_file("res://scenes/GameOver.tscn")
 
 func _on_end_turn_pressed():
 	print("End turn button pressed")

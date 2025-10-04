@@ -63,12 +63,26 @@ func _ready():
 		loadout_manager = preload("res://scripts/systems/LoadoutManager.gd").new()
 		print("LoadoutMenu: Created LoadoutManager")
 		
-		# Register all pieces from the default formation
+		# Load equipment data from GameState first (if it exists)
+		if GameState and GameState.piece_loadouts.size() > 0:
+			loadout_manager.piece_loadouts = GameState.piece_loadouts.duplicate(true)
+			print("LoadoutMenu: Loaded ", GameState.piece_loadouts.size(), " piece loadouts from GameState")
+			# Debug: show what was loaded
+			for piece_id in loadout_manager.piece_loadouts.keys():
+				var loadout = loadout_manager.piece_loadouts[piece_id]
+				print("  - ", piece_id, ": permanent=", loadout.get("permanent", []), " run=", loadout.get("run", []))
+		
+		# Register all pieces from the default formation (this will preserve existing loadouts)
 		for pos in default_formation:
 			var piece_data = default_formation[pos]
 			var piece_id = generate_piece_id(pos, piece_data.type)
-			loadout_manager.register_piece_instance(piece_id, piece_data.type, pos)
-			print("LoadoutMenu: Registered piece: ", piece_id, " at ", pos)
+			
+			# Only register if not already in loadouts (to preserve equipment)
+			if not loadout_manager.piece_loadouts.has(piece_id):
+				loadout_manager.register_piece_instance(piece_id, piece_data.type, pos)
+				print("LoadoutMenu: Registered new piece: ", piece_id, " at ", pos)
+			else:
+				print("LoadoutMenu: Piece already has loadout data: ", piece_id)
 		
 		# Load purchased items from GameState
 		var purchased_items = GameState.get_purchased_items()
@@ -245,6 +259,12 @@ func generate_piece_id(grid_pos: Vector2, piece_type: String) -> String:
 func has_equipped_items(piece_id: String) -> bool:
 	"""Check if a piece has any equipped items"""
 	if not loadout_manager:
+		print("LoadoutMenu: has_equipped_items - no loadout_manager")
+		return false
+	
+	# Check if this piece exists in loadouts
+	if not loadout_manager.piece_loadouts.has(piece_id):
+		print("LoadoutMenu: Piece ", piece_id, " not found in loadouts")
 		return false
 	
 	# Check all item slots for this piece using the actual LoadoutManager API
@@ -252,6 +272,7 @@ func has_equipped_items(piece_id: String) -> bool:
 	for slot in item_slots:
 		var equipped_items = loadout_manager.get_equipped_items(piece_id, slot)
 		if equipped_items.size() > 0:
+			print("LoadoutMenu: Piece ", piece_id, " has ", equipped_items.size(), " items in ", slot, " slot")
 			return true
 	return false
 
@@ -674,14 +695,21 @@ func set_managers(loadout_mgr, data_ldr):
 		show_piece_loadout(generate_piece_id(selected_piece_pos, selected_piece_data.type), selected_piece_data)
 
 func _on_back_to_menu_pressed():
-	# Save and return to main menu
+	# Save loadout data to GameState and save
 	print("LoadoutMenu: Returning to main menu")
+	if loadout_manager:
+		GameState.piece_loadouts = loadout_manager.piece_loadouts.duplicate(true)
+		print("LoadoutMenu: Saved ", GameState.piece_loadouts.size(), " piece loadouts to GameState")
 	GameState.save_current()
 	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func _on_start_battle_button_pressed():
 	# Handle start battle button press
 	print("LoadoutMenu: Starting battle, returning to main game scene")
+	# Save loadout data to GameState before starting battle
+	if loadout_manager:
+		GameState.piece_loadouts = loadout_manager.piece_loadouts.duplicate(true)
+		print("LoadoutMenu: Saved ", GameState.piece_loadouts.size(), " piece loadouts to GameState")
 	# Save before starting battle
 	GameState.save_current()
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")

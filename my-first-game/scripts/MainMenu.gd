@@ -163,6 +163,10 @@ func show_load_game_dialog():
 		for save_name in saves:
 			var save_info = GameState.save_manager.get_save_info(save_name)
 			
+			# Create horizontal container for save button and delete button
+			var save_row = HBoxContainer.new()
+			save_row.add_theme_constant_override("separation", 5)
+			
 			var save_button = Button.new()
 			save_button.text = "%s - Glyphs: %d | Items: %d | Score: %d\nLast played: %s" % [
 				save_name,
@@ -172,13 +176,29 @@ func show_load_game_dialog():
 				save_info.get("last_played", "Unknown")
 			]
 			save_button.custom_minimum_size = Vector2(0, 60)
+			save_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			save_button.pressed.connect(func():
 				GameState.load_save(save_name)
 				update_save_info()
-				continue_button.disabled = false
+				# Load and continue directly to LoadoutMenu
+				print("MainMenu: Loaded save '", save_name, "' and continuing to LoadoutMenu")
+				get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
 				dialog.queue_free()
 			)
-			save_list.add_child(save_button)
+			save_row.add_child(save_button)
+			
+			# Add delete button
+			var delete_button = Button.new()
+			delete_button.text = "✖"
+			delete_button.custom_minimum_size = Vector2(40, 60)
+			delete_button.tooltip_text = "Delete this save"
+			delete_button.add_theme_color_override("font_color", Color.RED)
+			delete_button.pressed.connect(func():
+				show_delete_confirmation(save_name, dialog)
+			)
+			save_row.add_child(delete_button)
+			
+			save_list.add_child(save_row)
 	
 	scroll.add_child(save_list)
 	dialog.add_child(scroll)
@@ -208,3 +228,52 @@ func show_overwrite_confirmation(save_name: String):
 	
 	add_child(confirm)
 	confirm.popup_centered()
+
+func show_delete_confirmation(save_name: String, parent_dialog: Window):
+	var confirm_dialog = Panel.new()
+	confirm_dialog.custom_minimum_size = Vector2(400, 200)
+	confirm_dialog.position = Vector2(get_viewport().size) / 2 - confirm_dialog.custom_minimum_size / 2
+	
+	var vbox = VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 10)
+	confirm_dialog.add_child(vbox)
+	
+	var title = Label.new()
+	title.text = "Delete Save?"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	vbox.add_child(title)
+	
+	var message = Label.new()
+	message.text = "Delete '%s'?\nThis cannot be undone." % save_name
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(message)
+	
+	var button_container = HBoxContainer.new()
+	button_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	button_container.add_theme_constant_override("separation", 20)
+	vbox.add_child(button_container)
+	
+	var cancel_button = Button.new()
+	cancel_button.text = "Cancel"
+	cancel_button.custom_minimum_size = Vector2(120, 40)
+	cancel_button.pressed.connect(confirm_dialog.queue_free)
+	button_container.add_child(cancel_button)
+	
+	var delete_button = Button.new()
+	delete_button.text = "Delete"
+	delete_button.custom_minimum_size = Vector2(120, 40)
+	delete_button.add_theme_color_override("font_color", Color.RED)
+	delete_button.pressed.connect(func():
+		GameState.save_manager.delete_save(save_name)
+		update_save_info()
+		confirm_dialog.queue_free()
+		parent_dialog.queue_free()
+		# Reopen the load dialog with updated list
+		show_load_game_dialog()
+	)
+	button_container.add_child(delete_button)
+	
+	add_child(confirm_dialog)

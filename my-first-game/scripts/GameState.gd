@@ -17,6 +17,8 @@ var game_over_army_info: String = ""
 var current_glyphs: int = 0
 var purchased_items: Array = []  # Array of item IDs purchased in current run (temporary)
 var permanent_items: Array = []  # Array of permanent items owned (persists across runs)
+var current_level: int = 1  # Current level in this run (session only, always starts at 1 each run)
+var piece_loadouts: Dictionary = {}  # Equipment assignments per piece (persists across levels in a run)
 
 func _ready():
 	# Create save manager
@@ -55,13 +57,35 @@ func sync_from_save():
 	# Load data from save manager into current session
 	current_glyphs = save_manager.get_glyphs()
 	permanent_items = save_manager.get_permanent_items().duplicate()
+	
+	# Load permanent equipment from save
+	var saved_loadouts = save_manager.get_piece_loadouts()
+	if saved_loadouts.size() > 0:
+		# Restore permanent equipment, initialize empty run/level/use slots
+		piece_loadouts.clear()
+		for piece_id in saved_loadouts.keys():
+			var saved_piece = saved_loadouts[piece_id]
+			piece_loadouts[piece_id] = {
+				"piece_type": saved_piece.get("piece_type", ""),
+				"grid_position": saved_piece.get("grid_position", Vector2.ZERO),
+				"permanent": saved_piece.get("permanent", []).duplicate(),
+				"run": [],
+				"level": [],
+				"use": []
+			}
+		print("GameState: Loaded ", piece_loadouts.size(), " piece loadouts from save")
+	
 	print("GameState: Synced from save - Glyphs: ", current_glyphs, " Permanent Items: ", permanent_items.size())
 
 func sync_to_save():
 	# Save current session data to save manager
 	save_manager.set_glyphs(current_glyphs)
-	# Permanent items are added individually via add_permanent_item
-	print("GameState: Synced to save - Glyphs: ", current_glyphs)
+	save_manager.set_piece_loadouts(piece_loadouts)  # Save permanent equipment
+	
+	# Sync permanent items array to save
+	save_manager.current_save_data["permanent_items"] = permanent_items.duplicate()
+	
+	print("GameState: Synced to save - Glyphs: ", current_glyphs, " Permanent Items: ", permanent_items.size(), " Equipment pieces: ", piece_loadouts.size())
 
 func set_game_over_data(winner: String, reason: String = "elimination", glyphs_recovered: int = 0, army_info: String = ""):
 	# Store game over data for the GameOver scene
@@ -117,8 +141,20 @@ func start_new_run():
 	# Reset run-specific data but keep permanent progression
 	clear_game_over_data()
 	purchased_items.clear()
+	current_level = 1
+	
+	# Clear only run-specific equipment, keep permanent items
+	for piece_id in piece_loadouts.keys():
+		if piece_loadouts[piece_id].has("run"):
+			piece_loadouts[piece_id]["run"].clear()
+		if piece_loadouts[piece_id].has("level"):
+			piece_loadouts[piece_id]["level"].clear()
+		if piece_loadouts[piece_id].has("use"):
+			piece_loadouts[piece_id]["use"].clear()
+		# Keep "permanent" slot intact
+	
 	# Keep current_glyphs and permanent_items
-	print("GameState: Started new run")
+	print("GameState: Started new run (kept permanent equipment)")
 
 func reset_all():
 	# Reset all game state (but don't delete save file)
