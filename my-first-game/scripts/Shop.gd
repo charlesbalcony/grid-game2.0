@@ -143,12 +143,16 @@ func _on_buy_item(item_data):
 func _on_new_run_button_pressed():
 	# Start a new run
 	print("Shop: Starting new run - going to loadout menu")
+	# Save before starting new run
+	GameState.save_current()
 	# Go to loadout menu to set up the army
 	get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
 
 func _on_back_button_pressed():
 	# Go back to the game
 	print("Shop: Returning to game")
+	# Save before returning
+	GameState.save_current()
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
 
 func show_purchase_confirmation(item_name: String, glyphs_spent: int, remaining_glyphs: int):

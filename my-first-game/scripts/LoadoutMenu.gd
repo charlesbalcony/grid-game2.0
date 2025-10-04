@@ -668,6 +668,8 @@ func set_managers(loadout_mgr, data_ldr):
 		show_piece_loadout(generate_piece_id(selected_piece_pos, selected_piece_data.type), selected_piece_data)
 
 func _on_start_battle_button_pressed():
-	"""Handle start battle button press"""
+	# Handle start battle button press
 	print("LoadoutMenu: Starting battle, returning to main game scene")
+	# Save before starting battle
+	GameState.save_current()
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
