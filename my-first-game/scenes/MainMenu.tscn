@@ -35,12 +35,11 @@ offset_right = 200.0
 offset_bottom = 250.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
+mouse_filter = 1
 
 [node name="Title" type="Label" parent="MenuContainer"]
 layout_mode = 2
-text = "GRID TACTICS
-[C] Continue  [N] New Game  [L] Load  [Q] Quit"
+text = "GRID TACTICS"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -51,16 +50,19 @@ mouse_filter = 2
 
 [node name="ContinueButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
+mouse_filter = 0
 text = "Continue"
 custom_minimum_size = Vector2(0, 50)
 
 [node name="NewGameButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
+mouse_filter = 0
 text = "New Game"
 custom_minimum_size = Vector2(0, 50)
 
 [node name="LoadGameButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
+mouse_filter = 0
 text = "Load Game"
 custom_minimum_size = Vector2(0, 50)
 
@@ -71,6 +73,7 @@ mouse_filter = 2
 
 [node name="QuitButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
+mouse_filter = 0
 text = "Quit"
 custom_minimum_size = Vector2(0, 50)
 

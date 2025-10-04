@@ -10,7 +10,6 @@ const UIManager = preload("res://scripts/components/UIManager.gd")
 const GameBoardAI = preload("res://scripts/components/GameBoardAI.gd")
 const ArmyManager = preload("res://scripts/systems/ArmyManager.gd")
 const Army = preload("res://scripts/systems/Army.gd")
-const HighScoreManager = preload("res://scripts/systems/HighScoreManager.gd")
 const GlyphManager = preload("res://scripts/systems/GlyphManager.gd")
 const ShopManager = preload("res://scripts/systems/ShopManager.gd")
 const LoadoutManager = preload("res://scripts/systems/LoadoutManager.gd")
@@ -29,7 +28,6 @@ var input_handler
 var ui_manager
 var ai_system
 var army_manager
-var high_score_manager
 var glyph_manager
 var shop_manager
 var loadout_manager
@@ -43,6 +41,9 @@ var enemy_indicator = null
 var high_score_label = null
 var glyph_label = null
 var ai_timer = null  # Store AI timer to cancel if needed
+
+# Track current level in this run
+var current_level = 1
 
 func _ready():
 	# Enforce fullscreen mode for consistent UI layout
@@ -65,13 +66,6 @@ func _ready():
 	# Initialize components
 	initialize_components()
 
-	# Initialize high score manager
-	high_score_manager = HighScoreManager.new()
-	add_child(high_score_manager)
-
-	# Connect to high score updates
-	high_score_manager.high_score_updated.connect(_on_high_score_updated)
-
 	# Initialize glyph manager
 	glyph_manager = GlyphManager.new()
 	add_child(glyph_manager)
@@ -79,6 +73,11 @@ func _ready():
 	# Connect to glyph updates
 	glyph_manager.glyphs_changed.connect(_on_glyphs_changed)
 	glyph_manager.glyph_reward.connect(_on_glyph_reward)
+	
+	# Load glyphs from GameState
+	if GameState:
+		glyph_manager.current_glyphs = GameState.current_glyphs
+		print("GameBoard: Loaded ", GameState.current_glyphs, " glyphs from GameState")
 
 	# Initialize shop manager
 	shop_manager = ShopManager.new()
@@ -122,6 +121,10 @@ func _ready():
 	# Now that game_manager is available, set it in the input handler
 	if input_handler and game_manager:
 		input_handler.set_game_manager(game_manager)
+	
+	# Initialize current level from army_manager
+	if army_manager:
+		current_level = army_manager.get_current_level()
 	
 	# Update high score display
 	update_high_score_display()
@@ -531,29 +534,45 @@ func restart_battle(winner: String = ""):
 		army_manager.advance_to_next_army()
 		print("Player won - Advanced to next army level")
 		
-		# Update high score tracking
-		if high_score_manager:
-			var new_level = army_manager.get_current_level()
-			high_score_manager.update_current_level(new_level)
-			high_score_manager.increment_battles_won()
+		# Update high score tracking via GameState
+		var new_level = army_manager.get_current_level()
+		current_level = new_level
+		
+		# Update high score if this is a new record
+		if GameState and GameState.save_manager:
+			var old_high_score = GameState.save_manager.get_high_score("classic")
+			if current_level > old_high_score:
+				GameState.save_manager.set_high_score("classic", current_level)
+				print("NEW HIGH SCORE! Reached Level ", current_level)
+				GameState.save_current()  # Save immediately when high score is set
+				update_high_score_display()
 		
 		# Check for glyph recovery when advancing
 		if glyph_manager:
 			var completed_level = old_level  # The level we just completed
 			glyph_manager.check_glyph_recovery(completed_level)
+			
+			# Sync glyphs to GameState and save
+			GameState.current_glyphs = glyph_manager.get_current_glyphs()
+			GameState.save_current()
+			print("GameBoard: Saved game after completing level ", completed_level)
 		
 	elif winner.to_lower() != "player" and army_manager:
 		army_manager.reset_to_first_army()
 		print("Player defeated - Army reset to Level 1")
 		
-		# Reset current level but keep high score
-		if high_score_manager:
-			high_score_manager.reset_current_level()
-			high_score_manager.increment_games_played()
+		# Reset current level (high score persists in save)
+		current_level = 1
+		update_high_score_display()
 		
 		# Lose glyphs when defeated
 		if glyph_manager:
 			glyph_manager.lose_glyphs(old_level)
+			
+			# Sync glyphs to GameState and save (loss is also saved)
+			GameState.current_glyphs = glyph_manager.get_current_glyphs()
+			GameState.save_current()
+			print("GameBoard: Saved game after defeat at level ", old_level)
 	
 	var new_level = army_manager.get_current_level() if army_manager else 1
 	print("Restarting battle with current army: ", army_manager.get_current_army().army_name)
@@ -613,12 +632,12 @@ func restart_battle_without_progression():
 		ui_manager.reset_input_blocking()
 	
 	# Army should already be reset to level 1 by the caller
-	var current_level = army_manager.get_current_level() if army_manager else 1
-	print("Restarting battle at level: ", current_level)
+	var level_for_restart = army_manager.get_current_level() if army_manager else 1
+	print("Restarting battle at level: ", level_for_restart)
 	
 	# Update AI difficulty for level 1
 	if ai_system:
-		if current_level == 1:
+		if level_for_restart == 1:
 			ai_system.set_difficulty_mode("easy")
 		else:
 			ai_system.set_difficulty_mode("medium")
@@ -675,20 +694,15 @@ func create_high_score_display():
 
 func update_high_score_display():
 	"""Update the high score display with current stats"""
-	if high_score_label and high_score_manager:
-		var current_level = high_score_manager.get_current_level()
-		var high_score = high_score_manager.get_high_score()
-		var games_played = high_score_manager.get_games_played()
+	if high_score_label:
+		var high_score = 1
+		if GameState and GameState.save_manager:
+			high_score = GameState.save_manager.get_high_score("classic")
 		
-		# Format: "Level 2/4 | Games: 5 | Record: Level 4"  
-		high_score_label.text = "Level %d/%d | Games: %d | Record: Level %d" % [current_level, high_score, games_played, high_score]
+		# Format: "Level 2/4 | Record: Level 4"  (removed games_played)
+		high_score_label.text = "Level %d | Record: Level %d" % [current_level, high_score]
 	elif high_score_label:
-		high_score_label.text = "High Score: Level 1"
-
-func _on_high_score_updated(new_high_score: int):
-	"""Handle high score updates"""
-	print("NEW HIGH SCORE ACHIEVED: Level ", new_high_score)
-	update_high_score_display()
+		high_score_label.text = "Level 1 | Record: Level 1"
 
 func _on_glyphs_changed(current_glyphs: int, stuck_glyphs: int, stuck_level: int):
 	"""Handle glyph count updates"""
@@ -747,10 +761,9 @@ func _on_start_new_run():
 	if army_manager:
 		army_manager.reset_to_first_army()
 	
-	# Reset current level but keep high score
-	if high_score_manager:
-		high_score_manager.reset_current_level()
-		high_score_manager.increment_games_played()
+	# Reset current level (high score persists in GameState save)
+	current_level = 1
+	update_high_score_display()
 	
 	# Clear run-specific items but keep permanent ones
 	if loadout_manager:

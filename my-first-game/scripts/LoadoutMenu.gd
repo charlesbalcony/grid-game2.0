@@ -8,6 +8,7 @@ extends Control
 @onready var formation_container = $MainContainer/ContentContainer/FormationSection/FormationContainer
 @onready var items_container = $MainContainer/ContentContainer/ItemsSection/ItemsContainer/ItemsContent
 @onready var loadout_container = $MainContainer/ContentContainer/LoadoutSection/LoadoutContainer/LoadoutContent
+@onready var back_to_menu_button = $MainContainer/ButtonsContainer/BackToMenuButton
 @onready var start_battle_button = $MainContainer/ButtonsContainer/StartBattleButton
 @onready var title_label = $MainContainer/Title
 @onready var formation_title = $MainContainer/ContentContainer/FormationSection/FormationTitle
@@ -91,6 +92,9 @@ func _ready():
 	print("LoadoutMenu: anchors: ", anchor_left, ",", anchor_top, ",", anchor_right, ",", anchor_bottom)
 	
 	# Connect button signals
+	if back_to_menu_button:
+		back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
+	
 	if start_battle_button:
 		start_battle_button.pressed.connect(_on_start_battle_button_pressed)
 		print("LoadoutMenu: Start battle button connected")
@@ -138,6 +142,8 @@ func setup_ui_styling():
 		loadout_title.add_theme_color_override("font_color", Color.CYAN)
 	
 	# Button styling
+	if back_to_menu_button:
+		back_to_menu_button.add_theme_font_size_override("font_size", 16)
 	if start_battle_button:
 		start_battle_button.add_theme_font_size_override("font_size", 16)
 		start_battle_button.modulate = Color.GOLD
@@ -666,6 +672,12 @@ func set_managers(loadout_mgr, data_ldr):
 	create_formation_display()
 	if selected_piece_data:
 		show_piece_loadout(generate_piece_id(selected_piece_pos, selected_piece_data.type), selected_piece_data)
+
+func _on_back_to_menu_pressed():
+	# Save and return to main menu
+	print("LoadoutMenu: Returning to main menu")
+	GameState.save_current()
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func _on_start_battle_button_pressed():
 	# Handle start battle button press

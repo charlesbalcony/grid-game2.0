@@ -16,11 +16,6 @@ var current_save_data = {
 	"high_scores": {
 		"classic": 0,
 		"endless": 0
-	},
-	"stats": {
-		"games_played": 0,
-		"total_kills": 0,
-		"total_deaths": 0
 	}
 }
 
@@ -170,11 +165,6 @@ func create_new_save(save_name: String) -> bool:
 		"high_scores": {
 			"classic": 0,
 			"endless": 0
-		},
-		"stats": {
-			"games_played": 0,
-			"total_kills": 0,
-			"total_deaths": 0
 		}
 	}
 	return save_game(save_name)
@@ -200,10 +190,3 @@ func set_high_score(mode: String, score: int):
 	if not current_save_data.has("high_scores"):
 		current_save_data["high_scores"] = {}
 	current_save_data["high_scores"][mode] = score
-
-func increment_stat(stat_name: String, amount: int = 1):
-	if not current_save_data.has("stats"):
-		current_save_data["stats"] = {}
-	if not current_save_data["stats"].has(stat_name):
-		current_save_data["stats"][stat_name] = 0
-	current_save_data["stats"][stat_name] += amount

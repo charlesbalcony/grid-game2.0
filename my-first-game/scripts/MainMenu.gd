@@ -16,77 +16,30 @@ func _ready():
 	# Enforce fullscreen
 	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-		print("MainMenu: Set fullscreen mode")
 	
 	# Wait for tree to be ready
 	await get_tree().process_frame
 	
-	print("MainMenu: Tree ready, connecting buttons")
-	
 	# Connect buttons
 	if continue_button:
 		continue_button.pressed.connect(_on_continue_pressed)
-		print("MainMenu: Continue button connected")
-	else:
-		print("MainMenu: ERROR - continue_button is null!")
-	
 	if new_game_button:
 		new_game_button.pressed.connect(_on_new_game_pressed)
-		print("MainMenu: New game button connected")
-	else:
-		print("MainMenu: ERROR - new_game_button is null!")
-	
 	if load_game_button:
 		load_game_button.pressed.connect(_on_load_game_pressed)
-		print("MainMenu: Load game button connected")
-	else:
-		print("MainMenu: ERROR - load_game_button is null!")
-	
 	if quit_button:
 		quit_button.pressed.connect(_on_quit_pressed)
-		print("MainMenu: Quit button connected")
-	else:
-		print("MainMenu: ERROR - quit_button is null!")
 	
 	# Style the menu
 	setup_styling()
 	
-	print("MainMenu: About to update save info")
 	# Update save info
 	update_save_info()
-	print("MainMenu: Save info updated")
 	
 	# Check if we have a save to continue from
 	if GameState and GameState.save_manager:
 		if not GameState.save_manager.save_exists(GameState.current_save_name):
 			continue_button.disabled = true
-			print("MainMenu: No save exists, disabling continue button")
-		else:
-			print("MainMenu: Save exists, continue button enabled")
-	else:
-		print("MainMenu: ERROR - GameState or save_manager is null!")
-	
-	# Ensure input processing is enabled
-	set_process_input(true)
-	set_process_unhandled_input(true)
-	
-	print("MainMenu: _ready() complete")
-
-func _process(_delta):
-	# Keyboard shortcuts since mouse isn't working
-	if Input.is_key_pressed(KEY_C):
-		_on_continue_pressed()
-	if Input.is_key_pressed(KEY_N):
-		_on_new_game_pressed()
-	if Input.is_key_pressed(KEY_L):
-		_on_load_game_pressed()
-	if Input.is_key_pressed(KEY_Q) or Input.is_key_pressed(KEY_ESCAPE):
-		_on_quit_pressed()
-
-func _input(event):
-	print("MainMenu: _input called with event: ", event)
-	if event is InputEventMouseButton:
-		print("MainMenu: Mouse click detected at: ", event.position, " pressed: ", event.pressed)
 
 func setup_styling():
 	# Title
@@ -99,7 +52,6 @@ func setup_styling():
 		if button:
 			button.add_theme_font_size_override("font_size", 20)
 			button.focus_mode = Control.FOCUS_ALL
-			print("MainMenu: Styled button: ", button.name)
 	
 	# Save info
 	if save_info_label:
@@ -123,42 +75,63 @@ func update_save_info():
 		save_info_label.text = "No save file found"
 
 func _on_continue_pressed():
-	print("MainMenu: Continue button PRESSED!")
 	print("MainMenu: Continue game")
-	# Load the existing save and go to loadout menu
 	GameState.load_save(GameState.current_save_name)
 	get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
 
 func _on_new_game_pressed():
-	print("MainMenu: New Game button PRESSED!")
 	print("MainMenu: New game")
-	# Show dialog to create new save or overwrite
 	show_new_game_dialog()
 
 func _on_load_game_pressed():
-	print("MainMenu: Load Game button PRESSED!")
 	print("MainMenu: Load game")
-	# Show load game dialog
 	show_load_game_dialog()
 
 func _on_quit_pressed():
-	print("MainMenu: Quit button PRESSED!")
 	print("MainMenu: Quit game")
-	# Save before quitting
 	GameState.save_current()
 	get_tree().quit()
 
 func show_new_game_dialog():
 	var dialog = ConfirmationDialog.new()
-	dialog.dialog_text = "Start a new game? This will reset your current progress."
+	dialog.dialog_text = "Enter a name for your new save file:"
 	dialog.title = "New Game"
+	dialog.min_size = Vector2(400, 150)
+	
+	# Add text input for save name
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	
+	var label = Label.new()
+	label.text = "Save Name:"
+	vbox.add_child(label)
+	
+	var line_edit = LineEdit.new()
+	line_edit.text = "save_" + str(Time.get_unix_time_from_system())
+	line_edit.placeholder_text = "Enter save name..."
+	line_edit.custom_minimum_size = Vector2(300, 40)
+	vbox.add_child(line_edit)
+	
+	dialog.add_child(vbox)
 	
 	dialog.confirmed.connect(func():
-		# Reset current save or create new one
-		GameState.create_new_save("default")
-		GameState.start_new_run()
-		get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
-		dialog.queue_free()
+		var save_name = line_edit.text.strip_edges()
+		if save_name.is_empty():
+			save_name = "save_" + str(Time.get_unix_time_from_system())
+		
+		# Check if save already exists
+		if GameState.save_manager.save_exists(save_name):
+			print("MainMenu: Save already exists, asking for overwrite confirmation")
+			show_overwrite_confirmation(save_name)
+			dialog.queue_free()
+		else:
+			# Create new save with the given name
+			print("MainMenu: Creating new save: ", save_name)
+			GameState.create_new_save(save_name)
+			GameState.start_new_run()
+			update_save_info()
+			get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
+			dialog.queue_free()
 	)
 	
 	dialog.canceled.connect(func(): dialog.queue_free())
@@ -213,3 +186,25 @@ func show_load_game_dialog():
 	add_child(dialog)
 	dialog.popup_centered()
 	dialog.confirmed.connect(func(): dialog.queue_free())
+
+func show_overwrite_confirmation(save_name: String):
+	var confirm = ConfirmationDialog.new()
+	confirm.dialog_text = "A save named '" + save_name + "' already exists. Overwrite it?"
+	confirm.title = "Overwrite Save?"
+	
+	confirm.confirmed.connect(func():
+		print("MainMenu: Overwriting save: ", save_name)
+		GameState.create_new_save(save_name)
+		GameState.start_new_run()
+		update_save_info()
+		get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
+		confirm.queue_free()
+	)
+	
+	confirm.canceled.connect(func():
+		confirm.queue_free()
+		show_new_game_dialog()  # Show the save name dialog again
+	)
+	
+	add_child(confirm)
+	confirm.popup_centered()
