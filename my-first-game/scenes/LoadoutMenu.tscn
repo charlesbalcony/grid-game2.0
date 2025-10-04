@@ -47,23 +47,43 @@ size_flags_vertical = 3
 [node name="FormationSection" type="VBoxContainer" parent="MainContainer/ContentContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.5
 
 [node name="FormationTitle" type="Label" parent="MainContainer/ContentContainer/FormationSection"]
 layout_mode = 2
-text = "Your Army Formation:"
+text = "Your Army Formation"
 horizontal_alignment = 1
 
 [node name="FormationContainer" type="VBoxContainer" parent="MainContainer/ContentContainer/FormationSection"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="LoadoutSection" type="VBoxContainer" parent="MainContainer/ContentContainer"]
+[node name="ItemsSection" type="VBoxContainer" parent="MainContainer/ContentContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
+
+[node name="ItemsTitle" type="Label" parent="MainContainer/ContentContainer/ItemsSection"]
+layout_mode = 2
+text = "Available Items"
+horizontal_alignment = 1
+
+[node name="ItemsContainer" type="ScrollContainer" parent="MainContainer/ContentContainer/ItemsSection"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ItemsContent" type="VBoxContainer" parent="MainContainer/ContentContainer/ItemsSection/ItemsContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="LoadoutSection" type="VBoxContainer" parent="MainContainer/ContentContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
+
 [node name="LoadoutTitle" type="Label" parent="MainContainer/ContentContainer/LoadoutSection"]
 layout_mode = 2
-text = "Piece Equipment:"
+text = "Selected Piece Equipment"
 horizontal_alignment = 1
 
 [node name="LoadoutContainer" type="ScrollContainer" parent="MainContainer/ContentContainer/LoadoutSection"]
@@ -77,11 +97,6 @@ size_flags_horizontal = 3
 [node name="ButtonsContainer" type="HBoxContainer" parent="MainContainer"]
 layout_mode = 2
 alignment = 1
-
-[node name="BackButton" type="Button" parent="MainContainer/ButtonsContainer"]
-layout_mode = 2
-text = "Back to Menu"
-custom_minimum_size = Vector2(150, 40)
 
 [node name="StartBattleButton" type="Button" parent="MainContainer/ButtonsContainer"]
 layout_mode = 2

@@ -115,7 +115,7 @@ func create_shop_item_display(item_data, current_glyphs):
 	return container
 
 func _on_buy_item(item_data):
-	"""Handle buying an item"""
+	# Handle buying an item
 	var price = item_data.get("glyph_cost", 10)
 	var current_glyphs = glyph_manager.get_current_glyphs()
 	
@@ -131,18 +131,58 @@ func _on_buy_item(item_data):
 		GameState.add_purchased_item(item_id)
 		print("Shop: Bought item: ", item_data.get("name", "Unknown"), " (ID: ", item_id, ")")
 		
+		# Show purchase confirmation popup
+		show_purchase_confirmation(item_data.get("name", "Item"), price, glyph_manager.get_current_glyphs())
+		
 		# Refresh display
 		setup_shop_display()
 	else:
-		print("Shop: Not enough glyphs!")
+		# Show error popup
+		show_insufficient_glyphs_popup(price, current_glyphs)
 
 func _on_new_run_button_pressed():
-	"""Start a new run"""
+	# Start a new run
 	print("Shop: Starting new run - going to loadout menu")
 	# Go to loadout menu to set up the army
 	get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
 
 func _on_back_button_pressed():
-	"""Go back to the game"""
+	# Go back to the game
 	print("Shop: Returning to game")
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+
+func show_purchase_confirmation(item_name: String, glyphs_spent: int, remaining_glyphs: int):
+	# Show a popup confirming the purchase
+	var popup = AcceptDialog.new()
+	popup.title = "Purchase Successful!"
+	popup.dialog_text = "Purchased: %s\n\nGlyphs Spent: %d\nRemaining Glyphs: %d" % [item_name, glyphs_spent, remaining_glyphs]
+	popup.ok_button_text = "OK"
+	
+	# Style the popup
+	popup.min_size = Vector2(400, 200)
+	
+	# Add to scene and show
+	add_child(popup)
+	popup.popup_centered()
+	
+	# Clean up when closed
+	popup.confirmed.connect(func(): popup.queue_free())
+	popup.canceled.connect(func(): popup.queue_free())
+
+func show_insufficient_glyphs_popup(price: int, current_glyphs: int):
+	# Show a popup when player doesn't have enough glyphs
+	var popup = AcceptDialog.new()
+	popup.title = "Insufficient Glyphs"
+	popup.dialog_text = "Not enough glyphs!\n\nRequired: %d\nYou have: %d\nNeed: %d more" % [price, current_glyphs, price - current_glyphs]
+	popup.ok_button_text = "OK"
+	
+	# Style the popup
+	popup.min_size = Vector2(400, 200)
+	
+	# Add to scene and show
+	add_child(popup)
+	popup.popup_centered()
+	
+	# Clean up when closed
+	popup.confirmed.connect(func(): popup.queue_free())
+	popup.canceled.connect(func(): popup.queue_free())

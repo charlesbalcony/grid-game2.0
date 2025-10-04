@@ -6,11 +6,12 @@ extends Control
 
 # References to child nodes
 @onready var formation_container = $MainContainer/ContentContainer/FormationSection/FormationContainer
+@onready var items_container = $MainContainer/ContentContainer/ItemsSection/ItemsContainer/ItemsContent
 @onready var loadout_container = $MainContainer/ContentContainer/LoadoutSection/LoadoutContainer/LoadoutContent
-@onready var back_button = $MainContainer/ButtonsContainer/BackButton
 @onready var start_battle_button = $MainContainer/ButtonsContainer/StartBattleButton
 @onready var title_label = $MainContainer/Title
 @onready var formation_title = $MainContainer/ContentContainer/FormationSection/FormationTitle
+@onready var items_title = $MainContainer/ContentContainer/ItemsSection/ItemsTitle
 @onready var loadout_title = $MainContainer/ContentContainer/LoadoutSection/LoadoutTitle
 
 # Default starting formation layout (independent of game state)
@@ -87,15 +88,9 @@ func _ready():
 	print("LoadoutMenu size: ", size)
 	print("LoadoutMenu visible: ", visible)
 	print("LoadoutMenu position: ", position)
-	print("LoadoutMenu anchors: ", anchor_left, ",", anchor_top, ",", anchor_right, ",", anchor_bottom)
+	print("LoadoutMenu: anchors: ", anchor_left, ",", anchor_top, ",", anchor_right, ",", anchor_bottom)
 	
 	# Connect button signals
-	if back_button:
-		back_button.pressed.connect(_on_back_button_pressed)
-		print("LoadoutMenu: Back button connected")
-	else:
-		print("LoadoutMenu: Back button is null!")
-		
 	if start_battle_button:
 		start_battle_button.pressed.connect(_on_start_battle_button_pressed)
 		print("LoadoutMenu: Start battle button connected")
@@ -107,6 +102,9 @@ func _ready():
 	
 	# Create the formation display
 	create_formation_display()
+	
+	# Populate items display
+	populate_items_display()
 	
 	# Show initial loadout message
 	show_loadout_instructions()
@@ -132,13 +130,14 @@ func setup_ui_styling():
 	if formation_title:
 		formation_title.add_theme_font_size_override("font_size", 20)
 		formation_title.add_theme_color_override("font_color", Color.CYAN)
+	if items_title:
+		items_title.add_theme_font_size_override("font_size", 20)
+		items_title.add_theme_color_override("font_color", Color.CYAN)
 	if loadout_title:
 		loadout_title.add_theme_font_size_override("font_size", 20)
 		loadout_title.add_theme_color_override("font_color", Color.CYAN)
 	
 	# Button styling
-	if back_button:
-		back_button.add_theme_font_size_override("font_size", 16)
 	if start_battle_button:
 		start_battle_button.add_theme_font_size_override("font_size", 16)
 		start_battle_button.modulate = Color.GOLD
@@ -472,7 +471,7 @@ func create_item_selection_dialog(piece_id: String, slot_type: String, available
 	dialog.confirmed.connect(func(): dialog.queue_free())
 
 func format_item_name(item_id: String) -> String:
-	"""Convert item ID to a readable display name"""
+	# Convert item ID to a readable display name
 	# Try to get actual item name from data if available
 	if data_loader:
 		var item_data = data_loader.get_item_by_id(item_id)
@@ -480,8 +479,8 @@ func format_item_name(item_id: String) -> String:
 			return item_data.name
 	
 	# Fallback to formatting the ID
-	var name = item_id.replace("_", " ")
-	var words = name.split(" ")
+	var display_name = item_id.replace("_", " ")
+	var words = display_name.split(" ")
 	var formatted_words = []
 	for word in words:
 		if word.length() > 0:
@@ -528,6 +527,9 @@ func equip_item(piece_id: String, slot_type: String, item_id: String):
 		
 		# Refresh formation display to show equipment indicators
 		create_formation_display()
+		
+		# Refresh items display
+		populate_items_display()
 	else:
 		print("Failed to equip ", item_id, " to ", piece_id)
 
@@ -546,8 +548,86 @@ func unequip_item(piece_id: String, slot_type: String, item_id: String):
 		
 		# Refresh formation display to update equipment indicators
 		create_formation_display()
+		
+		# Refresh items display
+		populate_items_display()
 	else:
 		print("Failed to unequip ", item_id, " from ", piece_id)
+
+func populate_items_display():
+	"""Populate the items display showing all owned items by category"""
+	if not items_container:
+		print("ERROR: items_container is null")
+		return
+	
+	if not loadout_manager or not data_loader:
+		print("ERROR: managers not initialized")
+		return
+	
+	# Clear existing display
+	for child in items_container.get_children():
+		child.queue_free()
+	
+	var all_items = loadout_manager.get_available_items()
+	
+	# Group items by type
+	var items_by_type = {
+		"permanent": [],
+		"run": [],
+		"level": [],
+		"consumable": []
+	}
+	
+	for item_id in all_items:
+		var item_data = data_loader.get_item_by_id(item_id)
+		if item_data:
+			var item_type = item_data.get("type", "consumable")
+			if items_by_type.has(item_type):
+				items_by_type[item_type].append({"id": item_id, "data": item_data})
+	
+	# Display each category
+	var type_labels = {
+		"permanent": "Permanent Items",
+		"run": "Run Items",
+		"level": "Level Items",
+		"consumable": "Consumables"
+	}
+	
+	var type_colors = {
+		"permanent": Color.GOLD,
+		"run": Color.CYAN,
+		"level": Color.LIGHT_GREEN,
+		"consumable": Color.ORANGE
+	}
+	
+	for type in ["permanent", "run", "level", "consumable"]:
+		var items = items_by_type[type]
+		
+		# Category header
+		var category_label = Label.new()
+		category_label.text = type_labels[type] + " (" + str(items.size()) + ")"
+		category_label.add_theme_font_size_override("font_size", 16)
+		category_label.add_theme_color_override("font_color", type_colors[type])
+		items_container.add_child(category_label)
+		
+		if items.size() == 0:
+			var empty_label = Label.new()
+			empty_label.text = "  (none)"
+			empty_label.add_theme_font_size_override("font_size", 12)
+			empty_label.add_theme_color_override("font_color", Color.GRAY)
+			items_container.add_child(empty_label)
+		else:
+			for item in items:
+				var item_label = Label.new()
+				item_label.text = "  • " + item.data.get("name", item.id)
+				item_label.add_theme_font_size_override("font_size", 12)
+				item_label.tooltip_text = item.data.get("description", "")
+				items_container.add_child(item_label)
+		
+		# Spacer
+		var spacer = Control.new()
+		spacer.custom_minimum_size = Vector2(0, 10)
+		items_container.add_child(spacer)
 
 func show_loadout_instructions():
 	"""Show initial instructions when no piece is selected"""
@@ -586,11 +666,6 @@ func set_managers(loadout_mgr, data_ldr):
 	create_formation_display()
 	if selected_piece_data:
 		show_piece_loadout(generate_piece_id(selected_piece_pos, selected_piece_data.type), selected_piece_data)
-
-func _on_back_button_pressed():
-	"""Handle back button press"""
-	print("LoadoutMenu: Going back to main game scene")
-	get_tree().change_scene_to_file("res://scenes/Main.tscn")
 
 func _on_start_battle_button_pressed():
 	"""Handle start battle button press"""
