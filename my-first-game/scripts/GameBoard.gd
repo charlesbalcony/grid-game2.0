@@ -539,7 +539,7 @@ func _on_game_over(winner: String, reason: String = "elimination"):
 	if army_manager:
 		var current_army = army_manager.get_current_army()
 		if current_army:
-			army_info = "Level " + str(current_army.level) + ": " + current_army.army_name
+			army_info = "Level " + str(completed_level) + ": " + current_army.army_name
 	
 	# Sync glyphs to GameState before transitioning
 	if glyph_manager:

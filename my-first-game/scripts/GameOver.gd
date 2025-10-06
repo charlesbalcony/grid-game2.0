@@ -48,11 +48,28 @@ func _ready():
 
 func setup_display():
 	"""Setup the game over display"""
-	# Set title
+	# Set title based on outcome
 	if title_label:
-		title_label.text = "GAME OVER!"
+		if winner_text.to_lower() == "player":
+			# Victory - show level completed
+			var level_num = ""
+			# Extract level number from army_info if available
+			if army_info != "" and army_info.begins_with("Level "):
+				var parts = army_info.split(":")
+				if parts.size() > 0:
+					level_num = parts[0]  # "Level X"
+			
+			if level_num != "":
+				title_label.text = level_num.to_upper() + " COMPLETE!"
+			else:
+				title_label.text = "VICTORY!"
+			title_label.add_theme_color_override("font_color", Color.GOLD)
+		else:
+			# Defeat - show game over
+			title_label.text = "GAME OVER!"
+			title_label.add_theme_color_override("font_color", Color.RED)
+		
 		title_label.add_theme_font_size_override("font_size", 48)
-		title_label.add_theme_color_override("font_color", Color.RED)
 	
 	# Set winner
 	if winner_label:
@@ -83,14 +100,6 @@ func setup_display():
 			var spacer = Control.new()
 			spacer.custom_minimum_size = Vector2(0, 20)
 			results_container.add_child(spacer)
-		
-		# Add reason if not standard elimination
-		if reason != "elimination":
-			var reason_label = Label.new()
-			reason_label.text = "Reason: " + reason.capitalize().replace("_", " ")
-			reason_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			reason_label.add_theme_font_size_override("font_size", 14)
-			results_container.add_child(reason_label)
 		
 		# Add glyph recovery info
 		if glyphs_recovered > 0:
@@ -142,7 +151,9 @@ func _on_shop_button_pressed():
 	"""Go to the shop or main menu depending on outcome"""
 	print("GameOver: Shop/Menu button pressed")
 	if winner_text.to_lower() == "player":
-		# Victory - go to shop
+		# Victory - end run and go to shop
+		GameState.start_new_run()  # Reset level to 1, clear run items
+		GameState.save_current()
 		get_tree().change_scene_to_file("res://scenes/Shop.tscn")
 	else:
 		# Defeat - go to main menu
