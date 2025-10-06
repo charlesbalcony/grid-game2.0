@@ -84,13 +84,32 @@ func _ready():
 			else:
 				print("LoadoutMenu: Piece already has loadout data: ", piece_id)
 		
-		# Load purchased items from GameState
+		# Load purchased items from GameState (temporary items for this run)
 		var purchased_items = GameState.get_purchased_items()
 		if purchased_items.size() > 0:
 			print("LoadoutMenu: Loading ", purchased_items.size(), " purchased items from GameState")
 			for item_id in purchased_items:
 				loadout_manager.add_available_item(item_id)
-				print("LoadoutMenu: Added item to available items: ", item_id)
+				print("LoadoutMenu: Added purchased item to available: ", item_id)
+		
+		# Load permanent items from GameState (but only if not already equipped)
+		var permanent_items = GameState.get_permanent_items()
+		if permanent_items.size() > 0:
+			print("LoadoutMenu: Loading ", permanent_items.size(), " permanent items from GameState")
+			for item_id in permanent_items:
+				# Check if this item is already equipped on any piece
+				var is_equipped = false
+				for piece_id in loadout_manager.piece_loadouts.keys():
+					var loadout = loadout_manager.piece_loadouts[piece_id]
+					if loadout.get("permanent", []).has(item_id):
+						is_equipped = true
+						print("LoadoutMenu: Permanent item ", item_id, " already equipped on ", piece_id)
+						break
+				
+				# Only add to available if not equipped
+				if not is_equipped:
+					loadout_manager.add_available_item(item_id)
+					print("LoadoutMenu: Added unequipped permanent item to available: ", item_id)
 	
 	# Ensure this node can process input
 	set_process_input(true)

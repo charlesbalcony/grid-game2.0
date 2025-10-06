@@ -94,7 +94,11 @@ func get_save_list() -> Array:
 	while file_name != "":
 		if not dir.current_is_dir() and file_name.ends_with(SAVE_EXTENSION):
 			var save_name = file_name.replace(SAVE_EXTENSION, "")
-			saves.append(save_name)
+			# Skip empty or invalid save names
+			if save_name != "" and save_name != null:
+				saves.append(save_name)
+			else:
+				print("SaveManager: Skipping invalid save file: ", file_name)
 		file_name = dir.get_next()
 	
 	dir.list_dir_end()
@@ -132,22 +136,52 @@ func get_save_info(save_name: String) -> Dictionary:
 
 # Delete a save file
 func delete_save(save_name: String) -> bool:
+	# Validate save name
+	if save_name == "" or save_name == null:
+		print("SaveManager: Cannot delete save with empty name")
+		return false
+	
 	var save_path = SAVE_DIR + save_name + SAVE_EXTENSION
 	
 	if not FileAccess.file_exists(save_path):
 		print("SaveManager: Save file not found for deletion: ", save_path)
 		return false
 	
+	# Try using OS.move_to_trash first (safer), fall back to direct deletion
+	var absolute_path = ProjectSettings.globalize_path(save_path)
+	print("SaveManager: Attempting to delete: ", absolute_path)
+	
+	# Direct file deletion
 	var dir = DirAccess.open(SAVE_DIR)
 	if dir == null:
+		print("SaveManager: Failed to open save directory for deletion")
 		return false
 	
 	var error = dir.remove(save_name + SAVE_EXTENSION)
 	if error == OK:
-		print("SaveManager: Deleted save file: ", save_name)
+		print("SaveManager: Successfully deleted save file: ", save_path)
+		# Verify deletion
+		if FileAccess.file_exists(save_path):
+			print("SaveManager: WARNING - File still exists after deletion!")
+			return false
+		
+		# If this was the current save, clear it
+		if current_save_data.get("save_name", "") == save_name:
+			current_save_data = {
+				"save_name": "",
+				"last_played": "",
+				"total_playtime": 0.0,
+				"glyphs": 0,
+				"permanent_items": [],
+				"piece_loadouts": {},
+				"high_scores": {
+					"classic": 0,
+					"endless": 0
+				}
+			}
 		return true
 	else:
-		print("SaveManager: Failed to delete save file: ", save_name)
+		print("SaveManager: Failed to delete save file (error ", error, "): ", save_path)
 		return false
 
 # Check if a save exists

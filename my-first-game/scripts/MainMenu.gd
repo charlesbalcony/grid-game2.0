@@ -38,7 +38,7 @@ func _ready():
 	
 	# Check if we have a save to continue from
 	if GameState and GameState.save_manager:
-		if not GameState.save_manager.save_exists(GameState.current_save_name):
+		if GameState.current_save_name == "" or not GameState.save_manager.save_exists(GameState.current_save_name):
 			continue_button.disabled = true
 
 func setup_styling():
@@ -63,16 +63,16 @@ func update_save_info():
 		return
 	
 	var save_name = GameState.current_save_name
-	if GameState.save_manager.save_exists(save_name):
+	if save_name != "" and GameState.save_manager.save_exists(save_name):
 		var info = GameState.save_manager.get_save_info(save_name)
-		save_info_label.text = "Save: %s | Glyphs: %d | Items: %d | High Score: %d" % [
+		save_info_label.text = "Save: %s | Glyphs: %d | High Score: %d" % [
 			save_name,
 			info.get("glyphs", 0),
-			info.get("permanent_items", 0),
 			info.get("high_score", 0)
 		]
 	else:
-		save_info_label.text = "No save file found"
+		save_info_label.text = ""  # Clear the text instead of showing "No save file found"
+		continue_button.disabled = true
 
 func _on_continue_pressed():
 	print("MainMenu: Continue game")
@@ -94,7 +94,7 @@ func _on_quit_pressed():
 
 func show_new_game_dialog():
 	var dialog = ConfirmationDialog.new()
-	dialog.dialog_text = "Enter a name for your new save file:"
+	dialog.dialog_text = ""  # Clear this to avoid overlap with custom content
 	dialog.title = "New Game"
 	dialog.min_size = Vector2(400, 150)
 	
@@ -142,7 +142,7 @@ func show_new_game_dialog():
 func show_load_game_dialog():
 	var dialog = AcceptDialog.new()
 	dialog.title = "Load Game"
-	dialog.dialog_text = "Select a save file:"
+	dialog.dialog_text = ""  # Clear this to avoid overlap with custom content
 	dialog.min_size = Vector2(400, 300)
 	
 	# Create list of save files
@@ -168,10 +168,9 @@ func show_load_game_dialog():
 			save_row.add_theme_constant_override("separation", 5)
 			
 			var save_button = Button.new()
-			save_button.text = "%s - Glyphs: %d | Items: %d | Score: %d\nLast played: %s" % [
+			save_button.text = "%s\nGlyphs: %d | High Score: %d | Last played: %s" % [
 				save_name,
 				save_info.get("glyphs", 0),
-				save_info.get("permanent_items", 0),
 				save_info.get("high_score", 0),
 				save_info.get("last_played", "Unknown")
 			]
@@ -230,50 +229,33 @@ func show_overwrite_confirmation(save_name: String):
 	confirm.popup_centered()
 
 func show_delete_confirmation(save_name: String, parent_dialog: Window):
-	var confirm_dialog = Panel.new()
-	confirm_dialog.custom_minimum_size = Vector2(400, 200)
-	confirm_dialog.position = Vector2(get_viewport().size) / 2 - confirm_dialog.custom_minimum_size / 2
+	var confirm = ConfirmationDialog.new()
+	confirm.dialog_text = "Delete '%s'?\nThis cannot be undone." % save_name
+	confirm.title = "Delete Save?"
+	confirm.ok_button_text = "Delete"
 	
-	var vbox = VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vbox.add_theme_constant_override("separation", 10)
-	confirm_dialog.add_child(vbox)
-	
-	var title = Label.new()
-	title.text = "Delete Save?"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 24)
-	vbox.add_child(title)
-	
-	var message = Label.new()
-	message.text = "Delete '%s'?\nThis cannot be undone." % save_name
-	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(message)
-	
-	var button_container = HBoxContainer.new()
-	button_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	button_container.add_theme_constant_override("separation", 20)
-	vbox.add_child(button_container)
-	
-	var cancel_button = Button.new()
-	cancel_button.text = "Cancel"
-	cancel_button.custom_minimum_size = Vector2(120, 40)
-	cancel_button.pressed.connect(confirm_dialog.queue_free)
-	button_container.add_child(cancel_button)
-	
-	var delete_button = Button.new()
-	delete_button.text = "Delete"
-	delete_button.custom_minimum_size = Vector2(120, 40)
-	delete_button.add_theme_color_override("font_color", Color.RED)
-	delete_button.pressed.connect(func():
+	# Make the delete button red
+	confirm.confirmed.connect(func():
+		print("MainMenu: Deleting save: ", save_name)
 		GameState.save_manager.delete_save(save_name)
+		
+		# If we deleted the current save, clear it from GameState
+		if GameState.current_save_name == save_name:
+			GameState.current_save_name = ""
+			GameState.current_glyphs = 0
+			GameState.permanent_items.clear()
+			GameState.piece_loadouts.clear()
+		
 		update_save_info()
-		confirm_dialog.queue_free()
+		confirm.queue_free()
 		parent_dialog.queue_free()
 		# Reopen the load dialog with updated list
 		show_load_game_dialog()
 	)
-	button_container.add_child(delete_button)
 	
-	add_child(confirm_dialog)
+	confirm.canceled.connect(func():
+		confirm.queue_free()
+	)
+	
+	add_child(confirm)
+	confirm.popup_centered()

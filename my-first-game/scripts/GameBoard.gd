@@ -556,6 +556,11 @@ func _on_game_over(winner: String, reason: String = "elimination"):
 	# Save current progress
 	GameState.save_current()
 	
+	# Clear any UI overlays (attack menu, highlights, etc.)
+	if ui_manager:
+		ui_manager.clear_attack_ui()
+		ui_manager.clear_any_overlays()
+	
 	# Transition to GameOver scene
 	get_tree().change_scene_to_file("res://scenes/GameOver.tscn")
 

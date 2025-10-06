@@ -5,7 +5,7 @@ extends Node
 
 # Save manager reference
 var save_manager = null
-var current_save_name: String = "default"
+var current_save_name: String = ""
 
 # Game over data (session only)
 var game_over_winner: String = ""
@@ -26,18 +26,23 @@ func _ready():
 	add_child(save_manager)
 	print("GameState: SaveManager initialized")
 	
-	# Try to load default save or create new one
-	if save_manager.save_exists("default"):
-		load_save("default")
-	else:
-		create_new_save("default")
+	# Don't auto-create or auto-load any save
+	# Let the player choose from the main menu
+	print("GameState: Ready - no save loaded. Use New Game or Load Game from menu.")
 
 # Save management
 func create_new_save(save_name: String) -> bool:
 	if save_manager.create_new_save(save_name):
 		current_save_name = save_name
+		# Clear all session data before syncing from the new empty save
+		current_glyphs = 0
+		purchased_items.clear()
+		permanent_items.clear()
+		piece_loadouts.clear()
+		current_level = 1
+		# Now sync from the fresh save file
 		sync_from_save()
-		print("GameState: Created new save: ", save_name)
+		print("GameState: Created new save: ", save_name, " - all data cleared")
 		return true
 	return false
 

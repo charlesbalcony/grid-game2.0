@@ -8,7 +8,7 @@ extends Control
 @onready var glyphs_label = $MainContainer/GlyphsLabel
 @onready var shop_content = $MainContainer/ShopContainer/ShopContent
 @onready var new_run_button = $MainContainer/ButtonsContainer/NewRunButton
-@onready var back_button = $MainContainer/ButtonsContainer/BackButton
+@onready var quit_to_menu_button = $MainContainer/ButtonsContainer/BackButton  # Repurposed as Quit to Menu
 
 # Managers
 var shop_manager = null
@@ -24,8 +24,9 @@ func _ready():
 	# Connect buttons
 	if new_run_button:
 		new_run_button.pressed.connect(_on_new_run_button_pressed)
-	if back_button:
-		back_button.pressed.connect(_on_back_button_pressed)
+	if quit_to_menu_button:
+		quit_to_menu_button.pressed.connect(_on_quit_to_menu_button_pressed)
+		quit_to_menu_button.text = "Quit to Menu"  # Update button text
 	
 	# Wait for nodes to be ready
 	await get_tree().process_frame
@@ -126,10 +127,16 @@ func _on_buy_item(item_data):
 		# Save updated glyphs to GameState
 		GameState.current_glyphs = glyph_manager.get_current_glyphs()
 		
-		# Add item to GameState inventory
+		# Add item to GameState inventory (check if it's permanent or temporary)
 		var item_id = item_data.get("id", item_data.get("name", "unknown"))
-		GameState.add_purchased_item(item_id)
-		print("Shop: Bought item: ", item_data.get("name", "Unknown"), " (ID: ", item_id, ")")
+		var item_type = item_data.get("type", "consumable")
+		
+		if item_type == "permanent":
+			GameState.add_permanent_item(item_id)
+			print("Shop: Bought permanent item: ", item_data.get("name", "Unknown"), " (ID: ", item_id, ")")
+		else:
+			GameState.add_purchased_item(item_id)
+			print("Shop: Bought temporary item: ", item_data.get("name", "Unknown"), " (ID: ", item_id, ")")
 		
 		# Show purchase confirmation popup
 		show_purchase_confirmation(item_data.get("name", "Item"), price, glyph_manager.get_current_glyphs())
@@ -148,12 +155,12 @@ func _on_new_run_button_pressed():
 	# Go to loadout menu to set up the army
 	get_tree().change_scene_to_file("res://scenes/LoadoutMenu.tscn")
 
-func _on_back_button_pressed():
-	# Go back to the game
-	print("Shop: Returning to game")
+func _on_quit_to_menu_button_pressed():
+	# Return to main menu and save
+	print("Shop: Quitting to main menu")
 	# Save before returning
 	GameState.save_current()
-	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func show_purchase_confirmation(item_name: String, glyphs_spent: int, remaining_glyphs: int):
 	# Show a popup confirming the purchase

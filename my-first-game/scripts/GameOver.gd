@@ -119,7 +119,7 @@ func setup_display():
 			new_game_button.text = "Next Level"
 			new_game_button.add_theme_color_override("font_color", Color.GREEN)
 		if shop_button:
-			shop_button.text = "Visit Shop"
+			shop_button.text = "End Run & Visit Shop"
 	else:
 		if new_game_button:
 			new_game_button.text = "Try Again"
