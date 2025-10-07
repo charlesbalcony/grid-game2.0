@@ -92,6 +92,43 @@ func _on_quit_pressed():
 	GameState.save_current()
 	get_tree().quit()
 
+func format_timestamp(timestamp: String) -> String:
+	"""Convert ISO timestamp to human-readable format"""
+	if timestamp == "" or timestamp == "Unknown":
+		return "Never"
+	
+	# Parse ISO format: "2025-10-05T19:13:05"
+	var parts = timestamp.split("T")
+	if parts.size() != 2:
+		return timestamp
+	
+	var date_parts = parts[0].split("-")
+	var time_parts = parts[1].split(":")
+	
+	if date_parts.size() != 3 or time_parts.size() < 2:
+		return timestamp
+	
+	var year = date_parts[0]
+	var month = date_parts[1]
+	var day = date_parts[2]
+	var hour = int(time_parts[0])
+	var minute = time_parts[1]
+	
+	# Convert to 12-hour format
+	var period = "AM"
+	if hour >= 12:
+		period = "PM"
+		if hour > 12:
+			hour -= 12
+	if hour == 0:
+		hour = 12
+	
+	# Month names
+	var month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+	var month_name = month_names[int(month) - 1] if int(month) >= 1 and int(month) <= 12 else month
+	
+	return "%s %s, %s at %d:%s %s" % [month_name, day, year, hour, minute, period]
+
 func show_new_game_dialog():
 	var dialog = ConfirmationDialog.new()
 	dialog.dialog_text = ""  # Clear this to avoid overlap with custom content
@@ -143,11 +180,11 @@ func show_load_game_dialog():
 	var dialog = AcceptDialog.new()
 	dialog.title = "Load Game"
 	dialog.dialog_text = ""  # Clear this to avoid overlap with custom content
-	dialog.min_size = Vector2(400, 300)
+	dialog.min_size = Vector2(600, 450)  # Increased size to show delete buttons without scrolling
 	
 	# Create list of save files
 	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(380, 200)
+	scroll.custom_minimum_size = Vector2(580, 350)  # Increased scroll area
 	
 	var save_list = VBoxContainer.new()
 	save_list.add_theme_constant_override("separation", 10)
@@ -168,13 +205,14 @@ func show_load_game_dialog():
 			save_row.add_theme_constant_override("separation", 5)
 			
 			var save_button = Button.new()
-			save_button.text = "%s\nGlyphs: %d | High Score: %d | Last played: %s" % [
+			var formatted_time = format_timestamp(save_info.get("last_played", "Unknown"))
+			save_button.text = "%s\nGlyphs: %d | High Score: %d\nLast played: %s" % [
 				save_name,
 				save_info.get("glyphs", 0),
 				save_info.get("high_score", 0),
-				save_info.get("last_played", "Unknown")
+				formatted_time
 			]
-			save_button.custom_minimum_size = Vector2(0, 60)
+			save_button.custom_minimum_size = Vector2(0, 70)  # Slightly taller for 3 lines
 			save_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			save_button.pressed.connect(func():
 				GameState.load_save(save_name)
@@ -189,7 +227,7 @@ func show_load_game_dialog():
 			# Add delete button
 			var delete_button = Button.new()
 			delete_button.text = "✖"
-			delete_button.custom_minimum_size = Vector2(40, 60)
+			delete_button.custom_minimum_size = Vector2(40, 70)  # Match save button height
 			delete_button.tooltip_text = "Delete this save"
 			delete_button.add_theme_color_override("font_color", Color.RED)
 			delete_button.pressed.connect(func():
