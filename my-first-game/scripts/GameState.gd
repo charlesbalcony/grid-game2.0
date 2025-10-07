@@ -118,16 +118,16 @@ func clear_game_over_data():
 
 func add_purchased_item(item_id: String):
 	# Add an item to the purchased items list (current run only)
-	if not purchased_items.has(item_id):
-		purchased_items.append(item_id)
-		print("GameState: Added purchased item: ", item_id)
+	# Allow duplicates so you can own multiple of the same item
+	purchased_items.append(item_id)
+	print("GameState: Added purchased item: ", item_id)
 
 func add_permanent_item(item_id: String):
 	# Add a permanent item (persists across runs)
-	if not permanent_items.has(item_id):
-		permanent_items.append(item_id)
-		save_manager.add_permanent_item(item_id)
-		print("GameState: Added permanent item: ", item_id)
+	# Allow duplicates so you can own multiple of the same item
+	permanent_items.append(item_id)
+	save_manager.add_permanent_item(item_id)
+	print("GameState: Added permanent item: ", item_id)
 
 func get_purchased_items() -> Array:
 	# Get all purchased items (current run)

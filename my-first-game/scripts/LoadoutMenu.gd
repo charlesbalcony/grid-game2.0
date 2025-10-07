@@ -92,22 +92,37 @@ func _ready():
 				loadout_manager.add_available_item(item_id)
 				print("LoadoutMenu: Added purchased item to available: ", item_id)
 		
-		# Load permanent items from GameState (but only if not already equipped)
+		# Load permanent items from GameState (add all copies, accounting for equipped ones)
 		var permanent_items = GameState.get_permanent_items()
 		if permanent_items.size() > 0:
 			print("LoadoutMenu: Loading ", permanent_items.size(), " permanent items from GameState")
+			
+			# Count how many of each item are equipped
+			var equipped_counts = {}
+			for piece_id in loadout_manager.piece_loadouts.keys():
+				var loadout = loadout_manager.piece_loadouts[piece_id]
+				for equipped_item in loadout.get("permanent", []):
+					if not equipped_counts.has(equipped_item):
+						equipped_counts[equipped_item] = 0
+					equipped_counts[equipped_item] += 1
+			
+			# Count how many of each item we own
+			var owned_counts = {}
 			for item_id in permanent_items:
-				# Check if this item is already equipped on any piece
-				var is_equipped = false
-				for piece_id in loadout_manager.piece_loadouts.keys():
-					var loadout = loadout_manager.piece_loadouts[piece_id]
-					if loadout.get("permanent", []).has(item_id):
-						is_equipped = true
-						print("LoadoutMenu: Permanent item ", item_id, " already equipped on ", piece_id)
-						break
+				if not owned_counts.has(item_id):
+					owned_counts[item_id] = 0
+				owned_counts[item_id] += 1
+			
+			# Add unequipped copies to available
+			for item_id in owned_counts.keys():
+				var owned = owned_counts[item_id]
+				var equipped = equipped_counts.get(item_id, 0)
+				var available = owned - equipped
 				
-				# Only add to available if not equipped
-				if not is_equipped:
+				print("LoadoutMenu: Item ", item_id, " - Owned: ", owned, " Equipped: ", equipped, " Available: ", available)
+				
+				# Add the available copies
+				for i in range(available):
 					loadout_manager.add_available_item(item_id)
 					print("LoadoutMenu: Added unequipped permanent item to available: ", item_id)
 	
@@ -616,12 +631,12 @@ func populate_items_display():
 	
 	var all_items = loadout_manager.get_available_items()
 	
-	# Group items by type
+	# Group items by type and count duplicates
 	var items_by_type = {
-		"permanent": [],
-		"run": [],
-		"level": [],
-		"consumable": []
+		"permanent": {},
+		"run": {},
+		"level": {},
+		"consumable": {}
 	}
 	
 	for item_id in all_items:
@@ -629,7 +644,10 @@ func populate_items_display():
 		if item_data:
 			var item_type = item_data.get("type", "consumable")
 			if items_by_type.has(item_type):
-				items_by_type[item_type].append({"id": item_id, "data": item_data})
+				# Count items - if already exists, increment count
+				if not items_by_type[item_type].has(item_id):
+					items_by_type[item_type][item_id] = {"data": item_data, "count": 0}
+				items_by_type[item_type][item_id]["count"] += 1
 	
 	# Display each category
 	var type_labels = {
@@ -647,27 +665,37 @@ func populate_items_display():
 	}
 	
 	for type in ["permanent", "run", "level", "consumable"]:
-		var items = items_by_type[type]
+		var items_dict = items_by_type[type]
+		
+		# Calculate total count
+		var total_count = 0
+		for item_id in items_dict.keys():
+			total_count += items_dict[item_id]["count"]
 		
 		# Category header
 		var category_label = Label.new()
-		category_label.text = type_labels[type] + " (" + str(items.size()) + ")"
+		category_label.text = type_labels[type] + " (" + str(total_count) + ")"
 		category_label.add_theme_font_size_override("font_size", 16)
 		category_label.add_theme_color_override("font_color", type_colors[type])
 		items_container.add_child(category_label)
 		
-		if items.size() == 0:
+		if items_dict.size() == 0:
 			var empty_label = Label.new()
 			empty_label.text = "  (none)"
 			empty_label.add_theme_font_size_override("font_size", 12)
 			empty_label.add_theme_color_override("font_color", Color.GRAY)
 			items_container.add_child(empty_label)
 		else:
-			for item in items:
+			for item_id in items_dict.keys():
+				var item_info = items_dict[item_id]
 				var item_label = Label.new()
-				item_label.text = "  • " + item.data.get("name", item.id)
+				# Show count if more than 1
+				var count_text = ""
+				if item_info["count"] > 1:
+					count_text = " x" + str(item_info["count"])
+				item_label.text = "  • " + item_info["data"].get("name", item_id) + count_text
 				item_label.add_theme_font_size_override("font_size", 12)
-				item_label.tooltip_text = item.data.get("description", "")
+				item_label.tooltip_text = item_info["data"].get("description", "")
 				items_container.add_child(item_label)
 		
 		# Spacer

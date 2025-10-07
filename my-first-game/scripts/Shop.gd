@@ -85,8 +85,31 @@ func create_shop_item_display(item_data, current_glyphs):
 	var info_vbox = VBoxContainer.new()
 	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	
+	# Count how many of this item we already own
+	var item_id = item_data.get("id", item_data.get("name", "unknown"))
+	var item_type = item_data.get("type", "consumable")
+	var owned_count = 0
+	
+	# Check permanent items
+	if item_type == "permanent":
+		var permanent_items = GameState.get_permanent_items()
+		for owned_id in permanent_items:
+			if owned_id == item_id:
+				owned_count += 1
+	else:
+		# Check purchased (run) items
+		var purchased_items = GameState.get_purchased_items()
+		for owned_id in purchased_items:
+			if owned_id == item_id:
+				owned_count += 1
+	
 	var name_label = Label.new()
-	name_label.text = item_data.get("name", "Unknown Item")
+	var item_name = item_data.get("name", "Unknown Item")
+	# Show owned count if any
+	if owned_count > 0:
+		name_label.text = item_name + " (Owned: " + str(owned_count) + ")"
+	else:
+		name_label.text = item_name
 	name_label.add_theme_font_size_override("font_size", 14)
 	info_vbox.add_child(name_label)
 	

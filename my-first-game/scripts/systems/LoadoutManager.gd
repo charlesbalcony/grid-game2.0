@@ -49,9 +49,8 @@ func set_available_items(items: Array):
 	available_items = items.duplicate()
 
 func add_available_item(item_id: String):
-	"""Add an item to the available inventory"""
-	if not available_items.has(item_id):
-		available_items.append(item_id)
+	"""Add an item to the available inventory - allows duplicates"""
+	available_items.append(item_id)
 
 func get_available_items() -> Array:
 	"""Get all items available for loadout"""

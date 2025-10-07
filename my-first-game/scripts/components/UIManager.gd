@@ -41,7 +41,7 @@ func _unhandled_input(event):
 	if is_blocking_input:
 		if event is InputEventMouseButton or event is InputEventMouseMotion or event is InputEventKey:
 			get_viewport().set_input_as_handled()
-			print("UIManager blocked input event: ", event.get_class())
+			# Removed debug print - was causing massive slowdown on mouse motion
 
 func set_parent_node(node: Node2D):
 	"""Set reference to the parent node"""
@@ -1087,7 +1087,7 @@ func show_loadout_screen(screen_type: String):
 		# Consume all input events to prevent them from reaching the background
 		if event is InputEventMouseButton or event is InputEventMouseMotion:
 			background.accept_event()
-			print("Loadout overlay consumed input event: ", event)
+			# Removed debug print - was causing massive slowdown on mouse motion
 	)
 	
 	# Main container

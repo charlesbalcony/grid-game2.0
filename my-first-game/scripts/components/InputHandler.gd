@@ -89,7 +89,7 @@ func _input(event):
 	
 	# Only allow input during player's turn
 	if game_manager and game_manager.current_team != "player":
-		print("Input blocked - current team: ", game_manager.current_team)
+		# Silently block input during enemy turn to avoid spam
 		return
 	
 	if event is InputEventMouseButton:

@@ -216,8 +216,8 @@ func get_permanent_items() -> Array:
 	return current_save_data.get("permanent_items", [])
 
 func add_permanent_item(item_id: String):
-	if not current_save_data["permanent_items"].has(item_id):
-		current_save_data["permanent_items"].append(item_id)
+	# Allow duplicates so players can own multiple of the same item
+	current_save_data["permanent_items"].append(item_id)
 
 func get_high_score(mode: String = "classic") -> int:
 	return current_save_data.get("high_scores", {}).get(mode, 0)
