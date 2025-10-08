@@ -74,10 +74,14 @@ func _ready():
 	glyph_manager.glyphs_changed.connect(_on_glyphs_changed)
 	glyph_manager.glyph_reward.connect(_on_glyph_reward)
 	
-	# Load glyphs from GameState
+	# Load glyphs and stuck glyph data from GameState
 	if GameState:
 		glyph_manager.current_glyphs = GameState.current_glyphs
+		glyph_manager.stuck_glyphs = GameState.stuck_glyphs
+		glyph_manager.stuck_at_level = GameState.stuck_at_level
 		print("GameBoard: Loaded ", GameState.current_glyphs, " glyphs from GameState")
+		if GameState.stuck_glyphs > 0:
+			print("GameBoard: ", GameState.stuck_glyphs, " glyphs stuck at Level ", GameState.stuck_at_level)
 
 	# Initialize shop manager
 	shop_manager = ShopManager.new()
@@ -772,6 +776,12 @@ func update_high_score_display():
 func _on_glyphs_changed(current_glyphs: int, stuck_glyphs: int, stuck_level: int):
 	"""Handle glyph count updates"""
 	print("Glyphs updated: Current=", current_glyphs, " Stuck=", stuck_glyphs, " at Level=", stuck_level)
+	
+	# Update GameState with current glyph data
+	GameState.current_glyphs = current_glyphs
+	GameState.stuck_glyphs = stuck_glyphs
+	GameState.stuck_at_level = stuck_level
+	
 	if ui_manager:
 		# Wait a frame to ensure UI elements are ready
 		await get_tree().process_frame

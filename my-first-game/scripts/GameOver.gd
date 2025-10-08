@@ -121,6 +121,27 @@ func setup_display():
 			recovery_message.add_theme_color_override("font_color", Color.LIGHT_BLUE)
 			recovery_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			results_container.add_child(recovery_message)
+		
+		# Add glyph loss info on defeat
+		if winner_text.to_lower() != "player" and GameState.stuck_glyphs > 0:
+			var spacer3 = Control.new()
+			spacer3.custom_minimum_size = Vector2(0, 10)
+			results_container.add_child(spacer3)
+			
+			var glyphs_lost_label = Label.new()
+			glyphs_lost_label.text = "⚠ " + str(GameState.stuck_glyphs) + " Glyphs Lost! ⚠"
+			glyphs_lost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			glyphs_lost_label.add_theme_font_size_override("font_size", 20)
+			glyphs_lost_label.add_theme_color_override("font_color", Color.ORANGE_RED)
+			results_container.add_child(glyphs_lost_label)
+			
+			var stuck_message = Label.new()
+			stuck_message.text = "Your glyphs are stuck at Level " + str(GameState.stuck_at_level) + "!\nBeat that level to recover them."
+			stuck_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			stuck_message.add_theme_font_size_override("font_size", 14)
+			stuck_message.add_theme_color_override("font_color", Color.LIGHT_CORAL)
+			stuck_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			results_container.add_child(stuck_message)
 	
 	# Update button labels based on outcome
 	if winner_text.to_lower() == "player":

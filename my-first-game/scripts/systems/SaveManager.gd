@@ -12,6 +12,8 @@ var current_save_data = {
 	"last_played": "",
 	"total_playtime": 0.0,
 	"glyphs": 0,
+	"stuck_glyphs": 0,  # Glyphs stuck at a level from defeat
+	"stuck_at_level": 0,  # The level where glyphs are stuck
 	"permanent_items": [],
 	"piece_loadouts": {},  # Store permanent equipment (only permanent slot)
 	"high_scores": {
@@ -211,6 +213,18 @@ func get_glyphs() -> int:
 
 func set_glyphs(amount: int):
 	current_save_data["glyphs"] = amount
+
+func get_stuck_glyphs() -> int:
+	return current_save_data.get("stuck_glyphs", 0)
+
+func set_stuck_glyphs(amount: int):
+	current_save_data["stuck_glyphs"] = amount
+
+func get_stuck_at_level() -> int:
+	return current_save_data.get("stuck_at_level", 0)
+
+func set_stuck_at_level(level: int):
+	current_save_data["stuck_at_level"] = level
 
 func get_permanent_items() -> Array:
 	return current_save_data.get("permanent_items", [])

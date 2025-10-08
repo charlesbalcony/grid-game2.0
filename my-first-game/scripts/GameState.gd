@@ -15,6 +15,8 @@ var game_over_army_info: String = ""
 
 # Current session data (syncs with save file)
 var current_glyphs: int = 0
+var stuck_glyphs: int = 0  # Glyphs stuck at a level from defeat
+var stuck_at_level: int = 0  # The level where glyphs are stuck
 var purchased_items: Array = []  # Array of item IDs purchased in current run (temporary)
 var permanent_items: Array = []  # Array of permanent items owned (persists across runs)
 var current_level: int = 1  # Current level in this run (session only, always starts at 1 each run)
@@ -61,6 +63,8 @@ func save_current() -> bool:
 func sync_from_save():
 	# Load data from save manager into current session
 	current_glyphs = save_manager.get_glyphs()
+	stuck_glyphs = save_manager.get_stuck_glyphs()
+	stuck_at_level = save_manager.get_stuck_at_level()
 	permanent_items = save_manager.get_permanent_items().duplicate()
 	
 	# Load permanent equipment from save
@@ -80,17 +84,19 @@ func sync_from_save():
 			}
 		print("GameState: Loaded ", piece_loadouts.size(), " piece loadouts from save")
 	
-	print("GameState: Synced from save - Glyphs: ", current_glyphs, " Permanent Items: ", permanent_items.size())
+	print("GameState: Synced from save - Glyphs: ", current_glyphs, " Stuck: ", stuck_glyphs, " at Level ", stuck_at_level, " Permanent Items: ", permanent_items.size())
 
 func sync_to_save():
 	# Save current session data to save manager
 	save_manager.set_glyphs(current_glyphs)
+	save_manager.set_stuck_glyphs(stuck_glyphs)
+	save_manager.set_stuck_at_level(stuck_at_level)
 	save_manager.set_piece_loadouts(piece_loadouts)  # Save permanent equipment
 	
 	# Sync permanent items array to save
 	save_manager.current_save_data["permanent_items"] = permanent_items.duplicate()
 	
-	print("GameState: Synced to save - Glyphs: ", current_glyphs, " Permanent Items: ", permanent_items.size(), " Equipment pieces: ", piece_loadouts.size())
+	print("GameState: Synced to save - Glyphs: ", current_glyphs, " Stuck: ", stuck_glyphs, " at Level ", stuck_at_level, " Permanent Items: ", permanent_items.size(), " Equipment pieces: ", piece_loadouts.size())
 
 func set_game_over_data(winner: String, reason: String = "elimination", glyphs_recovered: int = 0, army_info: String = ""):
 	# Store game over data for the GameOver scene
