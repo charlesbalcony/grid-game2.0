@@ -15,6 +15,9 @@ var grid_position: Vector2
 var is_selected: bool = false
 var is_alive: bool = true
 
+# Attack cooldown tracking (attack_name -> turns_remaining)
+var attack_cooldowns: Dictionary = {}
+
 # Base stats (before item bonuses)
 var base_attack_power: int
 var base_defense: int
@@ -132,15 +135,9 @@ func set_piece_type_data(type_data):
 	"""Set piece type data from PieceFactory for attacks and abilities"""
 	piece_type_data = type_data
 	if type_data and type_data.available_attacks:
-		# Convert PieceType attacks to simple dictionary format
-		available_attacks = []
-		for attack_data in type_data.available_attacks:
-			available_attacks.append({
-				"name": attack_data.name,
-				"damage": attack_data.damage,
-				"range": attack_data.range,
-				"description": attack_data.description
-			})
+		# Use the AttackData objects directly to preserve all properties including cooldowns
+		available_attacks = type_data.available_attacks.duplicate()
+		print("Set ", available_attacks.size(), " attacks for ", piece_type)
 
 func take_damage(damage: int):
 	var original_damage = damage
@@ -373,6 +370,36 @@ func debug_show_stats():
 	print("Base Stats - ATK:", base_attack_power, " DEF:", base_defense, " HP:", base_max_health)
 	print("Current Stats - ATK:", attack_power, " DEF:", defense, " HP:", current_health, "/", max_health)
 	print("=========================")
+
+func reduce_cooldowns():
+	"""Reduce all attack cooldowns by 1 at the start of this piece's turn"""
+	for attack_name in attack_cooldowns.keys():
+		if attack_cooldowns[attack_name] > 0:
+			attack_cooldowns[attack_name] -= 1
+			print(piece_type, " cooldown reduced: ", attack_name, " -> ", attack_cooldowns[attack_name], " turns remaining")
+
+func trigger_attack_cooldown(attack):
+	"""Start cooldown for an attack after it's used"""
+	var attack_name = attack.name if typeof(attack) == TYPE_OBJECT else attack.get("name", "")
+	var cooldown_max = attack.cooldown_max if typeof(attack) == TYPE_OBJECT else attack.get("cooldown_max", 0)
+	
+	if cooldown_max > 0:
+		attack_cooldowns[attack_name] = cooldown_max
+		print(piece_type, " used ", attack_name, " - cooldown: ", cooldown_max, " turns")
+
+func is_attack_on_cooldown(attack) -> bool:
+	"""Check if an attack is currently on cooldown"""
+	var attack_name = attack.name if typeof(attack) == TYPE_OBJECT else attack.get("name", "")
+	var cooldown_max = attack.cooldown_max if typeof(attack) == TYPE_OBJECT else attack.get("cooldown_max", 0)
+	
+	if cooldown_max == 0:
+		return false  # No cooldown, always available
+	return attack_cooldowns.get(attack_name, 0) > 0
+
+func get_attack_cooldown_remaining(attack) -> int:
+	"""Get the number of turns remaining on an attack's cooldown"""
+	var attack_name = attack.name if typeof(attack) == TYPE_OBJECT else attack.get("name", "")
+	return attack_cooldowns.get(attack_name, 0)
 
 func set_piece_id(id: String):
 	"""Set the piece ID from external code"""

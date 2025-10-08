@@ -305,12 +305,14 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	
 	# Calculate base damage based on attack type and attacker's stats
 	var damage = 0
+	var used_attack = null  # Track which attack was used for cooldown
 	if attacker.has("piece_node") and attacker.piece_node:
 		var attacker_piece = attacker.piece_node
 		# Look up the damage for the specific attack type
 		for attack in attacker_piece.available_attacks:
 			if attack.name.to_lower().contains(attack_type.to_lower()) or attack_type.to_lower().contains(attack.name.to_lower().split(" ")[0]):
 				damage = attack.damage
+				used_attack = attack  # Store the attack for cooldown
 				
 				# Scale the attack damage by the attacker's attack power ratio
 				var attack_power_ratio = float(attacker_piece.attack_power) / 25.0  # 25 is base warrior attack power
@@ -343,6 +345,10 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 		print("Warning: Could not find piece_node in target piece")
 		return
 	
+	# Trigger cooldown for the used attack
+	if used_attack and attacker.has("piece_node") and attacker.piece_node:
+		attacker.piece_node.trigger_attack_cooldown(used_attack)
+	
 	print("Attack: ", attacker_pos, " -> ", target_pos, " (", attack_type, ") for ", damage, " damage", 
 		  " (flanking x%.1f)" % flanking_multiplier if flanking_multiplier > 1.0 else "")
 	
@@ -361,7 +367,7 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	if game_manager:
 		game_manager.use_action()
 	
-	# Clear UI state  
+	# Clear UI state and return to move mode
 	ui_manager.clear_attack_ui()
 	input_handler.set_mode("MOVE")
 
@@ -426,6 +432,9 @@ func check_win_condition():
 func _on_turn_changed(player_index):
 	print("=== TURN CHANGED to: ", player_index, " ===")
 	
+	# Reduce cooldowns for all pieces of the current team
+	reduce_team_cooldowns(player_index)
+	
 	# Cancel any existing AI timer
 	if ai_timer:
 		print("Cancelling existing AI timer")
@@ -470,6 +479,16 @@ func _on_actions_used_up():
 	print("All actions used up for this turn")
 	# Turn switching is already handled by game_manager.use_action()
 	# Don't call force_end_turn() here to avoid double switching
+
+func reduce_team_cooldowns(team: String):
+	"""Reduce cooldowns for all pieces on the specified team"""
+	if not piece_manager:
+		return
+	
+	var team_pieces = piece_manager.get_pieces_by_team(team)
+	for piece_data in team_pieces:
+		if piece_data.has("piece_node") and is_instance_valid(piece_data.piece_node):
+			piece_data.piece_node.reduce_cooldowns()
 
 func _on_piece_died(piece):
 	"""Handle when any piece dies - check for game over and award glyphs"""

@@ -25,6 +25,7 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/mode=4
 window/size/resizable=false
+window/vsync/vsync_mode=0
 
 [input]
 
@@ -37,3 +38,23 @@ select={
 [rendering]
 
 renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="gl_compatibility"
+driver/threads/thread_model=2
+2d/snap/snap_2d_transforms_to_pixel=true
+2d/snap/snap_2d_vertices_to_pixel=true
+environment/defaults/default_clear_color=Color(0.1, 0.1, 0.1, 1)
+
+[debug]
+
+gdscript/warnings/unused_variable=1
+gdscript/warnings/unused_parameter=0
+gdscript/warnings/shadowed_variable=0
+settings/stdout/print_fps=false
+settings/stdout/verbose_stdout=false
+
+[shader_compiler]
+
+shader_cache/enabled=true
+shader_cache/compress=true
+shader_cache/use_zstd_compression=true
+shader_cache/strip_debug.release=true

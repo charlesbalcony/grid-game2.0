@@ -312,8 +312,50 @@ func show_attack_options(piece_data):
 	for i in range(attacks.size()):
 		var attack = attacks[i]
 		var button = Button.new()
-		button.text = attack.name + " (" + str(attack.damage) + " dmg)"
-		button.pressed.connect(func(): execute_attack(attack))
+		
+		# Check if attack is on cooldown
+		var cooldown_remaining = piece_node.get_attack_cooldown_remaining(attack)
+		var on_cooldown = piece_node.is_attack_on_cooldown(attack)
+		
+		# Get attack properties (handle both Dictionary and AttackData object)
+		var attack_name = attack.name if typeof(attack) == TYPE_OBJECT else attack.get("name", "Unknown")
+		var attack_damage = attack.damage if typeof(attack) == TYPE_OBJECT else attack.get("damage", 0)
+		var attack_description = attack.description if typeof(attack) == TYPE_OBJECT else attack.get("description", "")
+		var attack_cooldown_max = attack.cooldown_max if typeof(attack) == TYPE_OBJECT else attack.get("cooldown_max", 0)
+		
+		# Check if this attack is currently selected
+		var attack_type = "basic"
+		if "Heavy" in attack_name:
+			attack_type = "Heavy"
+		elif "Quick" in attack_name:
+			attack_type = "Quick"
+		else:
+			attack_type = "Basic"
+		
+		var is_selected = piece_data.has("selected_attack") and piece_data.selected_attack == attack_type
+		
+		# Build button text with cooldown info and selection indicator
+		var button_text = attack_name + " (" + str(attack_damage) + " dmg)"
+		if is_selected:
+			button_text = "► " + button_text + " ◄"
+		
+		if on_cooldown:
+			button.text = button_text + " [CD: " + str(cooldown_remaining) + "]"
+			button.disabled = true
+			button.add_theme_color_override("font_color", Color.DARK_GRAY)
+			button.tooltip_text = attack_description + "\nCooldown: " + str(cooldown_remaining) + " turn(s) remaining"
+		else:
+			button.text = button_text
+			button.tooltip_text = attack_description
+			if attack_cooldown_max > 0:
+				button.tooltip_text += "\n(Cooldown: " + str(attack_cooldown_max) + " turns after use)"
+			
+			# Highlight selected attack
+			if is_selected:
+				button.add_theme_color_override("font_color", Color.YELLOW)
+		
+		# Pass both attack and button to execute_attack so we can update the UI
+		button.pressed.connect(func(): execute_attack(attack, piece_data))
 		vbox.add_child(button)
 	
 	# Add separator before items
@@ -420,6 +462,32 @@ func show_attack_options(piece_data):
 	cancel_button.text = "Cancel"
 	cancel_button.pressed.connect(func(): hide_attack_ui())
 	vbox.add_child(cancel_button)
+	
+	# Auto-select the first available attack (not on cooldown)
+	if attacks.size() > 0:
+		var selected_attack = null
+		for attack in attacks:
+			if not piece_node.is_attack_on_cooldown(attack):
+				selected_attack = attack
+				break
+		
+		# If all attacks are on cooldown, select the first one anyway (but it will be disabled)
+		if selected_attack == null and attacks.size() > 0:
+			selected_attack = attacks[0]
+		
+		# Set the default selected attack
+		if selected_attack:
+			var attack_type = "basic"
+			var attack_name = selected_attack.name if typeof(selected_attack) == TYPE_OBJECT else selected_attack.get("name", "")
+			if "Heavy" in attack_name:
+				attack_type = "Heavy"
+			elif "Quick" in attack_name:
+				attack_type = "Quick"
+			else:
+				attack_type = "Basic"
+			
+			piece_data["selected_attack"] = attack_type
+			print("Auto-selected attack: ", attack_type)
 	
 	# Make the attack UI visible!
 	attack_ui.visible = true
@@ -534,33 +602,133 @@ func hide_attack_ui():
 	if parent_node and parent_node.input_handler and parent_node.input_handler.has_method("set_mode"):
 		parent_node.input_handler.set_mode("MOVE")
 
-func execute_attack(attack_data):
+func execute_attack(attack_data, piece_data = null):
 	"""Execute an attack selection"""
 	print("Attack selected: ", attack_data.name, " - Click target to attack")
 	
 	# Set the selected attack on the currently selected piece
-	if parent_node and parent_node.has_method("get_selected_piece"):
-		var selected_piece = parent_node.get_selected_piece()
-		if selected_piece:
-			# Set the attack type based on attack name
+	var selected_piece = piece_data if piece_data else (parent_node.get_selected_piece() if parent_node and parent_node.has_method("get_selected_piece") else null)
+	
+	if selected_piece:
+		# Set the attack type based on attack name
+		var attack_type = "basic"
+		if "Heavy" in attack_data.name:
+			attack_type = "Heavy"
+		elif "Quick" in attack_data.name:
+			attack_type = "Quick"
+		else:
+			attack_type = "Basic"
+		
+		selected_piece["selected_attack"] = attack_type
+		print("Set selected_attack to: ", attack_type, " on piece")
+		
+		# Don't hide the attack UI - keep it visible to show selection
+		# Just update the button highlights without rebuilding
+		if piece_data:
+			update_attack_selection_display(piece_data)
+		
+		# Switch to attack mode - call method on parent's input handler
+		if parent_node.input_handler and parent_node.input_handler.has_method("set_mode"):
+			print("Setting attack mode after selecting attack type")
+			parent_node.input_handler.set_mode("ATTACK")
+
+func update_attack_selection_display(piece_data):
+	"""Update the visual display of which attack is selected without rebuilding the UI"""
+	if not attack_ui or not piece_data:
+		return
+	
+	var panel = attack_ui.get_child(0) if attack_ui.get_child_count() > 0 else null
+	if not panel:
+		return
+	
+	var vbox = panel.get_child(0) if panel.get_child_count() > 0 else null
+	if not vbox:
+		return
+	
+	var piece_node = piece_data.get("piece_node")
+	if not piece_node or not is_instance_valid(piece_node):
+		return
+	
+	var attacks = piece_node.get_available_attacks()
+	var selected_attack_type = piece_data.get("selected_attack", "Basic")
+	
+	# Check if the currently selected attack is on cooldown
+	# If so, auto-select the first available attack
+	var selected_attack_on_cooldown = false
+	for attack in attacks:
+		var attack_name = attack.name if typeof(attack) == TYPE_OBJECT else attack.get("name", "Unknown")
+		var attack_type = "basic"
+		if "Heavy" in attack_name:
+			attack_type = "Heavy"
+		elif "Quick" in attack_name:
+			attack_type = "Quick"
+		else:
+			attack_type = "Basic"
+		
+		if attack_type == selected_attack_type and piece_node.is_attack_on_cooldown(attack):
+			selected_attack_on_cooldown = true
+			break
+	
+	# Auto-select first available attack if current selection is on cooldown
+	if selected_attack_on_cooldown:
+		for attack in attacks:
+			if not piece_node.is_attack_on_cooldown(attack):
+				var attack_name = attack.name if typeof(attack) == TYPE_OBJECT else attack.get("name", "Unknown")
+				if "Heavy" in attack_name:
+					selected_attack_type = "Heavy"
+				elif "Quick" in attack_name:
+					selected_attack_type = "Quick"
+				else:
+					selected_attack_type = "Basic"
+				piece_data["selected_attack"] = selected_attack_type
+				print("Auto-switched to available attack: ", selected_attack_type)
+				break
+	
+	# Find and update attack buttons (they're after the health display and separator)
+	var button_index = 0
+	for child in vbox.get_children():
+		if child is Button and button_index < attacks.size():
+			var attack = attacks[button_index]
+			
+			# Get attack properties
+			var attack_name = attack.name if typeof(attack) == TYPE_OBJECT else attack.get("name", "Unknown")
+			var attack_damage = attack.damage if typeof(attack) == TYPE_OBJECT else attack.get("damage", 0)
+			var attack_cooldown_max = attack.cooldown_max if typeof(attack) == TYPE_OBJECT else attack.get("cooldown_max", 0)
+			
+			# Determine attack type
 			var attack_type = "basic"
-			if "Heavy" in attack_data.name:
+			if "Heavy" in attack_name:
 				attack_type = "Heavy"
-			elif "Quick" in attack_data.name:
+			elif "Quick" in attack_name:
 				attack_type = "Quick"
 			else:
 				attack_type = "Basic"
 			
-			selected_piece["selected_attack"] = attack_type
-			print("Set selected_attack to: ", attack_type, " on piece")
+			var is_selected = (attack_type == selected_attack_type)
 			
-			# Hide the attack UI
-			hide_attack_ui()
+			# Check if on cooldown
+			var cooldown_remaining = piece_node.get_attack_cooldown_remaining(attack)
+			var on_cooldown = piece_node.is_attack_on_cooldown(attack)
 			
-			# Switch to attack mode - call method on parent's input handler
-			if parent_node.input_handler and parent_node.input_handler.has_method("set_mode"):
-				print("Setting attack mode after selecting attack type")
-				parent_node.input_handler.set_mode("ATTACK")
+			# Update button text and color
+			var button_text = attack_name + " (" + str(attack_damage) + " dmg)"
+			if is_selected:
+				button_text = "► " + button_text + " ◄"
+			
+			if on_cooldown:
+				child.text = button_text + " [CD: " + str(cooldown_remaining) + "]"
+				child.disabled = true
+				child.add_theme_color_override("font_color", Color.DARK_GRAY)
+			else:
+				child.text = button_text
+				child.disabled = false
+				# Highlight selected attack
+				if is_selected:
+					child.add_theme_color_override("font_color", Color.YELLOW)
+				else:
+					child.remove_theme_color_override("font_color")
+			
+			button_index += 1
 
 func show_attack_targets(attacker_pos: Vector2, selected_piece):
 	"""Highlight valid attack targets"""

@@ -12,6 +12,8 @@ class_name AttackData
 @export var attack_type: AttackType = AttackType.MELEE
 @export var area_of_effect: bool = false
 @export var status_effects: Array[String] = []
+@export var cooldown: int = 0  # Turns until this attack is available again (0 = always available)
+@export var cooldown_max: int = 0  # Max cooldown turns when used
 
 enum AttackType {
 	MELEE,      # Close range attack

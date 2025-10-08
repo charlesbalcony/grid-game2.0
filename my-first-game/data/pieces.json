@@ -28,21 +28,10 @@
           "damage": 40,
           "range": 1,
           "accuracy": 0.6,
-          "description": "Powerful attack with high damage",
+          "description": "Powerful attack with high damage (2 turn cooldown)",
           "attack_type": "melee",
           "area_of_effect": false,
-          "cooldown": 1
-        },
-        {
-          "id": "quick_jab",
-          "name": "Quick Jab",
-          "damage": 15,
-          "range": 1,
-          "accuracy": 0.9,
-          "description": "Fast attack with low damage",
-          "attack_type": "melee",
-          "area_of_effect": false,
-          "cooldown": 0
+          "cooldown": 2
         }
       ],
       "passive_abilities": [],

@@ -81,6 +81,7 @@ func create_attack_from_data(attack_data: Dictionary) -> AttackData:
 	attack.accuracy = attack_data.get("accuracy", 0.8)
 	attack.description = attack_data.get("description", "")
 	attack.area_of_effect = attack_data.get("area_of_effect", false)
+	attack.cooldown_max = attack_data.get("cooldown", 0)
 	
 	# Set attack type
 	var attack_type_str = attack_data.get("attack_type", "melee")

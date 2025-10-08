@@ -378,9 +378,7 @@ func handle_attack_click(grid_pos: Vector2):
 					parent_node.perform_attack(selected_position, grid_pos, selected_piece.selected_attack)
 				
 				# Action usage is handled by perform_attack() in GameBoard
-				
-				piece_manager.clear_selection()
-				set_mode("MOVE")
+				# Clear selection and return to move mode (done in perform_attack)
 			else:
 				print("Target too far away!")
 		else:

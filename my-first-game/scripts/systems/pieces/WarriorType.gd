@@ -14,8 +14,7 @@ func _init():
 	# Warrior attacks
 	available_attacks = [
 		create_basic_attack(),
-		create_heavy_strike(),
-		create_quick_jab()
+		create_heavy_strike()
 	]
 
 func create_basic_attack() -> AttackData:
@@ -34,8 +33,9 @@ func create_heavy_strike() -> AttackData:
 	attack.damage = 40
 	attack.range = 1
 	attack.accuracy = 0.6
-	attack.description = "Powerful attack with high damage"
+	attack.description = "Powerful attack with high damage (2 turn cooldown)"
 	attack.attack_type = AttackData.AttackType.MELEE
+	attack.cooldown_max = 2  # 2 turns before it can be used again
 	return attack
 
 func create_quick_jab() -> AttackData:
