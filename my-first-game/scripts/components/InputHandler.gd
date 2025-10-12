@@ -396,9 +396,13 @@ func handle_attack_click(grid_pos: Vector2):
 					var distance = grid_system.get_manhattan_distance(grid_pos, selected_position)
 					var euclidean_distance = grid_system.get_distance(grid_pos, selected_position)
 					
-					# Allow both adjacent and diagonal attacks
-					if distance <= 2 and euclidean_distance <= 1.5:  # Adjacent or diagonal
+					# Only allow adjacent squares (1 step away in any direction including diagonals)
+					# Manhattan distance <= 1 means directly adjacent (up/down/left/right)
+					# Euclidean distance <= 1.5 means diagonal (sqrt(2) ≈ 1.414)
+					if distance <= 1 or (euclidean_distance <= 1.5 and distance == 2):
 						can_attack = true
+					else:
+						print("Distance check: Manhattan=", distance, ", Euclidean=", euclidean_distance)
 			
 			if can_attack:
 				# Check if we can use an action

@@ -99,10 +99,17 @@ func _ready():
 	loadout_manager.item_equipped.connect(_on_item_equipped)
 	loadout_manager.item_unequipped.connect(_on_item_unequipped)
 	
-	# Load loadout data from GameState if it exists
-	if GameState and GameState.piece_loadouts.size() > 0:
+	# Sync loadout data: LoadoutManager loads from disk, we sync to GameState
+	# LoadoutManager is the source of truth
+	if loadout_manager and loadout_manager.piece_loadouts.size() > 0:
+		# Sync LoadoutManager's data to GameState
+		GameState.piece_loadouts = loadout_manager.piece_loadouts.duplicate(true)
+		print("GameBoard: Synced ", loadout_manager.piece_loadouts.size(), " piece loadouts to GameState")
+	elif GameState and GameState.piece_loadouts.size() > 0:
+		# Fallback: if LoadoutManager is empty but GameState has data, load from GameState
 		loadout_manager.piece_loadouts = GameState.piece_loadouts.duplicate(true)
-		print("GameBoard: Loaded ", GameState.piece_loadouts.size(), " piece loadouts from GameState")
+		loadout_manager.save_loadouts()  # Save to disk
+		print("GameBoard: Loaded ", GameState.piece_loadouts.size(), " piece loadouts from GameState to LoadoutManager")
 	
 	# Setup UI manager connections now that all managers are initialized
 	setup_ui_manager_connections()	# Get references to game manager and UI elements  

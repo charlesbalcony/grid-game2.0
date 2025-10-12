@@ -84,6 +84,16 @@ func _ready():
 			else:
 				print("LoadoutMenu: Piece already has loadout data: ", piece_id)
 		
+		# Clear level items if we're advancing to a new level in the same run
+		# (current_level > 1 means we just completed a level and are advancing)
+		if GameState.current_level > 1:
+			print("LoadoutMenu: Advancing from level ", GameState.current_level - 1, " to ", GameState.current_level)
+			print("LoadoutMenu: Clearing level-specific items from previous level...")
+			loadout_manager.clear_level_items()
+			GameState.clear_level_items_from_purchased()
+		else:
+			print("LoadoutMenu: Starting new run at level 1, keeping all purchased items")
+		
 		# Load purchased items from GameState (temporary items for this run)
 		var purchased_items = GameState.get_purchased_items()
 		if purchased_items.size() > 0:

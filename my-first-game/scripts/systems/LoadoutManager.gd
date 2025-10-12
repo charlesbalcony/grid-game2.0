@@ -174,11 +174,56 @@ func get_all_instances_of_type(piece_type: String) -> Array:
 
 func clear_level_items():
 	"""Clear all level-specific items (called at end of level)"""
+	print("=== CLEARING LEVEL ITEMS ===")
+	
+	# Get DataLoader to check item types
+	var data_loader = get_node_or_null("/root/GameState/DataLoader")
+	if not data_loader:
+		print("ERROR: Could not find DataLoader")
+		return
+	
+	# Clear level items from ALL slots in all piece loadouts
+	# Need to check item type in data, not just the slot they're in
 	for instance_id in piece_loadouts.keys():
-		piece_loadouts[instance_id]["level"].clear()
+		var loadout = piece_loadouts[instance_id]
+		
+		# Check each slot type
+		for slot_type in ["permanent", "run", "level", "use"]:
+			if not loadout.has(slot_type):
+				continue
+			
+			var slot_items = loadout[slot_type]
+			var items_to_remove = []
+			
+			# Find items with type "level"
+			for item_id in slot_items:
+				var item_data = data_loader.get_item_by_id(item_id)
+				if item_data and item_data.get("type", "") == "level":
+					items_to_remove.append(item_id)
+					print("  Found level item in ", slot_type, " slot: ", item_id, " on ", instance_id)
+			
+			# Remove them
+			for item_id in items_to_remove:
+				slot_items.erase(item_id)
+				print("  Removed level item: ", item_id, " from ", instance_id, " ", slot_type, " slot")
+	
+	# Remove ALL level-type items from available_items pool
+	var filtered_items = []
+	var removed_count = 0
+	for item_id in available_items:
+		var item_data = data_loader.get_item_by_id(item_id)
+		if item_data and item_data.get("type", "") == "level":
+			print("  Removing level item from pool: ", item_id)
+			removed_count += 1
+		else:
+			filtered_items.append(item_id)
+	
+	available_items = filtered_items
+	print("Removed ", removed_count, " level items from available pool")
+	print("Remaining available items: ", available_items.size())
 	
 	save_loadouts()
-	print("Cleared all level-specific items")
+	print("=== LEVEL ITEMS CLEARED ===")
 
 func clear_run_items():
 	"""Clear all run-specific items (called at end of run)"""
@@ -189,6 +234,14 @@ func clear_run_items():
 	
 	save_loadouts()
 	print("Cleared all run-specific items")
+
+func clear_all():
+	"""Clear all loadouts and available items (called when starting a new game)"""
+	print("=== CLEARING ALL LOADOUT DATA ===")
+	piece_loadouts.clear()
+	available_items.clear()
+	save_loadouts()
+	print("=== ALL LOADOUT DATA CLEARED ===")
 
 func use_item(instance_id: String, item_id: String) -> bool:
 	"""Consume a use item (remove from loadout)"""

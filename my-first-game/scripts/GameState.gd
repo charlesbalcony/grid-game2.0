@@ -42,6 +42,13 @@ func create_new_save(save_name: String) -> bool:
 		permanent_items.clear()
 		piece_loadouts.clear()
 		current_level = 1
+		
+		# Delete old loadout save file so new game starts fresh
+		var loadout_save_path = "user://loadouts.save"
+		if FileAccess.file_exists(loadout_save_path):
+			DirAccess.remove_absolute(loadout_save_path)
+			print("GameState: Deleted old loadout save file for new game")
+		
 		# Now sync from the fresh save file
 		sync_from_save()
 		print("GameState: Created new save: ", save_name, " - all data cleared")
@@ -147,6 +154,27 @@ func clear_purchased_items():
 	# Clear purchased items (for new run)
 	purchased_items.clear()
 	print("GameState: Cleared purchased items")
+
+func clear_level_items_from_purchased():
+	"""Remove level-type items from purchased_items (called at end of level)"""
+	# Need DataLoader to check item types
+	var data_loader = get_node_or_null("DataLoader")
+	if not data_loader:
+		print("GameState: ERROR - Could not find DataLoader to clear level items")
+		return
+	
+	var filtered_items = []
+	var removed_count = 0
+	for item_id in purchased_items:
+		var item_data = data_loader.get_item_by_id(item_id)
+		if item_data and item_data.get("type", "") == "level":
+			print("GameState: Removing level item from purchased: ", item_id)
+			removed_count += 1
+		else:
+			filtered_items.append(item_id)
+	
+	purchased_items = filtered_items
+	print("GameState: Cleared ", removed_count, " level items from purchased_items")
 
 func start_new_run():
 	# Reset run-specific data but keep permanent progression
