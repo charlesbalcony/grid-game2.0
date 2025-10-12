@@ -271,6 +271,17 @@ func show_attack_options(piece_data):
 	# Wait a frame for cleanup
 	await get_tree().process_frame
 	
+	# Re-validate piece after waiting, it might have been freed
+	if not is_instance_valid(piece_node):
+		print("ERROR: piece_node became invalid during UI cleanup")
+		return
+	
+	# Re-check attacks in case piece state changed
+	attacks = piece_node.get_available_attacks()
+	if not attacks or attacks.size() == 0:
+		print("WARNING: piece has no attacks after cleanup")
+		return
+	
 	# Add health display
 	var health_container = HBoxContainer.new()
 	health_container.add_theme_constant_override("separation", 5)

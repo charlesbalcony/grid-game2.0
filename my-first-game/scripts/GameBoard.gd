@@ -164,6 +164,30 @@ func _ready():
 	# Initialize the board
 	setup_board()
 
+func _exit_tree():
+	"""Clean up resources when scene is being freed"""
+	print("GameBoard: Cleaning up resources...")
+	
+	# Stop any running timers
+	if ai_timer and is_instance_valid(ai_timer):
+		ai_timer.stop()
+		ai_timer.queue_free()
+	
+	# Clean up UI highlights and overlays
+	if ui_manager:
+		ui_manager.clear_attack_highlights()
+		ui_manager.clear_drag_highlights()
+		ui_manager.clear_movement_highlights()
+	
+	# Disconnect signals to prevent errors
+	if glyph_manager and is_instance_valid(glyph_manager):
+		if glyph_manager.glyphs_changed.is_connected(_on_glyphs_changed):
+			glyph_manager.glyphs_changed.disconnect(_on_glyphs_changed)
+		if glyph_manager.glyph_reward.is_connected(_on_glyph_reward):
+			glyph_manager.glyph_reward.disconnect(_on_glyph_reward)
+	
+	print("GameBoard: Cleanup complete")
+
 func initialize_components():
 	"""Initialize all game system components"""
 	grid_system = GridSystem.new()

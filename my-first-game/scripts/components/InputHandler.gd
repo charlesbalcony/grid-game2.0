@@ -276,15 +276,42 @@ func handle_right_click(world_pos: Vector2):
 			print("ERROR: piece has no team property at position ", grid_pos)
 			return
 		
+		# Check if piece_node exists and is valid before proceeding
+		if not piece.has("piece_node"):
+			print("ERROR: piece has no piece_node at position ", grid_pos)
+			return
+		
+		var piece_node = piece.piece_node
+		if not is_instance_valid(piece_node):
+			print("ERROR: piece_node is invalid or being freed at position ", grid_pos)
+			return
+		
+		# Check if queued for deletion
+		if piece_node.is_queued_for_deletion():
+			print("ERROR: piece_node is queued for deletion at position ", grid_pos)
+			return
+		
 		# Only allow right-clicking own pieces
 		if piece.team == "player":
-			piece_manager.select_piece(grid_pos)
+			# Try to select the piece, it might fail if piece becomes invalid
+			var selection_success = piece_manager.select_piece(grid_pos)
 			
-			# Add safety check for UI manager and piece structure
-			if ui_manager and piece.has("piece_node") and is_instance_valid(piece.piece_node):
-				ui_manager.show_attack_options(piece)
+			if not selection_success:
+				print("ERROR: Failed to select piece at ", grid_pos)
+				return
+			
+			# Double-check piece is still valid after selection
+			if not is_instance_valid(piece_node) or piece_node.is_queued_for_deletion():
+				print("ERROR: piece_node became invalid after selection")
+				piece_manager.clear_selection()
+				return
+			
+			# Show attack options - defer to avoid timing issues
+			if ui_manager:
+				# Use call_deferred to ensure piece is fully selected before showing UI
+				ui_manager.call_deferred("show_attack_options", piece)
 			else:
-				print("ERROR: Invalid piece structure or UI manager for attack options")
+				print("ERROR: UI manager not available")
 				return
 			
 			set_mode("ATTACK")
@@ -297,7 +324,13 @@ func handle_right_click(world_pos: Vector2):
 			print("Canceling attack mode - clicked empty space")
 			set_mode("MOVE")
 	
-	right_click_processed.emit(grid_pos)
+	# Defer signal emission to avoid crashes during piece deletion
+	call_deferred("_emit_right_click_signal", grid_pos)
+
+func _emit_right_click_signal(grid_pos: Vector2):
+	"""Safely emit right click signal"""
+	if is_instance_valid(self):
+		right_click_processed.emit(grid_pos)
 
 func handle_move_click(grid_pos: Vector2):
 	"""Handle click in move mode"""

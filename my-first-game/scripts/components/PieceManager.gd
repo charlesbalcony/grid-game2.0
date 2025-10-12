@@ -162,6 +162,13 @@ func select_piece(grid_pos: Vector2) -> bool:
 	
 	if pieces.has(grid_pos):
 		selected_piece = pieces[grid_pos]
+		
+		# Validate piece_node before selecting
+		if not selected_piece.has("piece_node") or not is_instance_valid(selected_piece.piece_node):
+			print("ERROR: Cannot select piece - piece_node is invalid at ", grid_pos)
+			selected_piece = null
+			return false
+		
 		selected_position = grid_pos
 		create_selection_highlight(grid_pos)
 		
@@ -260,7 +267,16 @@ func get_pieces_by_team(team: String) -> Array:
 
 func get_piece_at_position(pos: Vector2):
 	"""Get piece data at a specific position"""
-	return pieces.get(pos, null)
+	var piece_data = pieces.get(pos, null)
+	
+	# Validate that the piece_node is still valid
+	if piece_data and piece_data.has("piece_node"):
+		if not is_instance_valid(piece_data.piece_node):
+			# Piece node is being freed or already freed, clean up
+			pieces.erase(pos)
+			return null
+	
+	return piece_data
 
 func is_position_occupied(pos: Vector2) -> bool:
 	"""Check if a position has a piece"""
