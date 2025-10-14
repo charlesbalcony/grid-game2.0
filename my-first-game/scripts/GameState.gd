@@ -7,6 +7,9 @@ extends Node
 var save_manager = null
 var current_save_name: String = ""
 
+# Data loader reference (for item type checking)
+var data_loader = null
+
 # Game over data (session only)
 var game_over_winner: String = ""
 var game_over_reason: String = "elimination"
@@ -27,6 +30,13 @@ func _ready():
 	save_manager = preload("res://scripts/systems/SaveManager.gd").new()
 	add_child(save_manager)
 	print("GameState: SaveManager initialized")
+	
+	# Create data loader (for item type checking when clearing level items)
+	data_loader = preload("res://scripts/systems/DataLoader.gd").new()
+	data_loader.name = "DataLoader"  # Give it a name so it can be found by get_node
+	add_child(data_loader)
+	data_loader.load_items()
+	print("GameState: DataLoader initialized")
 	
 	# Don't auto-create or auto-load any save
 	# Let the player choose from the main menu
@@ -157,10 +167,9 @@ func clear_purchased_items():
 
 func clear_level_items_from_purchased():
 	"""Remove level-type items from purchased_items (called at end of level)"""
-	# Need DataLoader to check item types
-	var data_loader = get_node_or_null("DataLoader")
+	# Use the GameState's DataLoader
 	if not data_loader:
-		print("GameState: ERROR - Could not find DataLoader to clear level items")
+		print("GameState: ERROR - DataLoader not initialized")
 		return
 	
 	var filtered_items = []

@@ -572,6 +572,14 @@ func _on_game_over(winner: String, reason: String = "elimination"):
 		current_level = next_level
 		print("GameBoard: Player won! Next level will be: ", next_level)
 		
+		# CLEAR LEVEL ITEMS immediately after winning - they shouldn't persist to next level
+		print("=== CLEARING LEVEL ITEMS AFTER VICTORY ===")
+		if loadout_manager:
+			loadout_manager.clear_level_items()
+			print("Level items cleared from loadout manager")
+		GameState.clear_level_items_from_purchased()
+		print("Level items cleared from GameState purchased items")
+		
 		# Update high score if this is a new record
 		if GameState and GameState.save_manager:
 			var old_high_score = GameState.save_manager.get_high_score("classic")
@@ -631,6 +639,16 @@ func _on_army_changed(new_army: Army):
 func _on_level_completed(completed_army: Army):
 	"""Handle when a level is completed"""
 	print("Level completed! Defeated: ", completed_army.army_name)
+	
+	# Clear level-specific items immediately when level is completed
+	print("Clearing level items after completing level...")
+	if loadout_manager:
+		loadout_manager.clear_level_items()
+		print("Level items cleared from loadout manager")
+	
+	# Clear level items from GameState purchased items
+	GameState.clear_level_items_from_purchased()
+	print("Level items cleared from GameState purchased items")
 
 func restart_battle(winner: String = ""):
 	"""Restart the battle while preserving army progression"""
