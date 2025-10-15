@@ -134,6 +134,10 @@ func _ready():
 		if ui_manager:
 			ui_manager.create_glyph_display()
 	
+	# Create event feed
+	if ui_manager:
+		ui_manager.create_event_feed()
+	
 	# Now that game_manager is available, set it in the input handler
 	if input_handler and game_manager:
 		input_handler.set_game_manager(game_manager)
@@ -230,6 +234,9 @@ func initialize_components():
 	# Initialize glyph display UI
 	ui_manager.create_glyph_display()
 	
+	# Initialize event feed UI
+	ui_manager.create_event_feed()
+	
 	# Initialize army manager first
 	army_manager = ArmyManager.new()
 	army_manager.army_changed.connect(_on_army_changed)
@@ -245,7 +252,7 @@ func initialize_components():
 	
 	# Set AI difficulty based on army level
 	var army_level = army_manager.get_current_level()
-	if army_level == 1:
+	if army_level < 5:
 		ai_system.set_difficulty_mode("easy")
 	else:
 		ai_system.set_difficulty_mode("medium")
@@ -322,6 +329,10 @@ func _on_piece_moved(piece, from_pos, to_pos):
 	if game_manager:
 		game_manager.use_action()
 	print("Piece moved from ", from_pos, " to ", to_pos)
+	
+	# Show move event in feed
+	if ui_manager:
+		ui_manager.show_move_notification(piece.piece_type, piece.team, from_pos, to_pos)
 
 func _on_attack_performed(attacker_pos, target_pos, attack_type):
 	# Handle attack execution
@@ -364,6 +375,13 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	# Apply flanking multiplier
 	damage = int(damage * flanking_multiplier)
 	
+	# Show attack notification BEFORE applying damage (so it appears before death events)
+	var attacker_team = attacker.team if attacker else "unknown"
+	ui_manager.show_attack_notification(attacker_team, attack_type, damage, target_pos)
+	
+	# Create attack effect
+	ui_manager.create_attack_effect(grid_system.grid_to_world_pos(target_pos))
+	
 	# Apply damage
 	print("Target piece structure: ", target)
 	if target.has("piece_node") and target.piece_node:
@@ -382,13 +400,6 @@ func perform_attack(attacker_pos: Vector2, target_pos: Vector2, attack_type: Str
 	
 	print("Attack: ", attacker_pos, " -> ", target_pos, " (", attack_type, ") for ", damage, " damage", 
 		  " (flanking x%.1f)" % flanking_multiplier if flanking_multiplier > 1.0 else "")
-	
-	# Show attack notification
-	var attacker_team = attacker.team if attacker else "unknown"
-	ui_manager.show_attack_notification(attacker_team, attack_type, damage, target_pos)
-	
-	# Create attack effect
-	ui_manager.create_attack_effect(grid_system.grid_to_world_pos(target_pos))
 	
 	# Check if target is defeated - piece death is handled by the piece itself
 	# The piece will call die() which triggers _on_piece_died signal in PieceManager
@@ -525,6 +536,10 @@ func _on_piece_died(piece):
 	"""Handle when any piece dies - check for game over and award glyphs"""
 	print("Piece died: ", piece.piece_type, " (", piece.team, ")")
 	
+	# Show death event in feed
+	if ui_manager:
+		ui_manager.show_piece_death_event(piece.team, piece.piece_type)
+	
 	# Award glyphs for destroying enemy pieces
 	if piece.team == "enemy" and glyph_manager:
 		# Get the piece's grid position for the reward notification
@@ -534,12 +549,17 @@ func _on_piece_died(piece):
 		elif "grid_pos" in piece:
 			grid_pos = piece.grid_pos
 		
+		var glyphs = 0
 		if piece.piece_type == "king":
-			var glyphs = glyph_manager.award_king_glyph(grid_pos)
+			glyphs = glyph_manager.award_king_glyph(grid_pos)
 			print("KING BONUS: +", glyphs, " glyphs!")
 		else:
-			var glyphs = glyph_manager.award_enemy_glyph(grid_pos)
+			glyphs = glyph_manager.award_enemy_glyph(grid_pos)
 			print("Enemy destroyed: +", glyphs, " glyphs")
+		
+		# Show glyph reward in event feed AND as popup
+		if ui_manager and glyphs > 0:
+			ui_manager.show_glyph_reward_event(glyphs, piece.piece_type)
 	
 	check_win_condition()
 
@@ -716,12 +736,12 @@ func restart_battle(winner: String = ""):
 	
 	# Update AI difficulty if army level changed
 	if old_level != new_level and ai_system:
-		if new_level == 1:
+		if new_level < 5:
 			ai_system.set_difficulty_mode("easy")
 		else:
 			ai_system.set_difficulty_mode("medium")
 	
-	# Clear existing pieces
+	# Clear existing pieces...
 	print("Clearing pieces...")
 	piece_manager.clear_all_pieces()
 	
@@ -774,12 +794,12 @@ func restart_battle_without_progression():
 	
 	# Update AI difficulty for level 1
 	if ai_system:
-		if level_for_restart == 1:
+		if level_for_restart < 5:
 			ai_system.set_difficulty_mode("easy")
 		else:
 			ai_system.set_difficulty_mode("medium")
 	
-	# Clear existing pieces
+	# Clear existing pieces...
 	print("Clearing pieces...")
 	piece_manager.clear_all_pieces()
 	
@@ -977,6 +997,10 @@ func apply_battle_start_effects():
 func get_loadout_manager():
 	"""Get reference to the loadout manager"""
 	return loadout_manager
+
+func get_ui_manager():
+	"""Get reference to the UI manager"""
+	return ui_manager
 
 func show_run_loadout():
 	"""Show the loadout screen for beginning of run"""

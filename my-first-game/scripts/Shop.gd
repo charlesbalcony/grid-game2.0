@@ -78,12 +78,21 @@ func setup_shop_display():
 
 func create_shop_item_display(item_data, current_glyphs):
 	"""Create a display for a shop item"""
-	var container = HBoxContainer.new()
-	container.custom_minimum_size = Vector2(0, 50)
+	# Main container with margin and separator
+	var main_container = VBoxContainer.new()
+	main_container.add_theme_constant_override("separation", 5)
 	
-	# Item info
+	# Center container to constrain width
+	var center_container = CenterContainer.new()
+	
+	var container = HBoxContainer.new()
+	container.custom_minimum_size = Vector2(800, 80)  # Fixed width to keep content together
+	container.add_theme_constant_override("separation", 15)
+	
+	# Item info section (left side)
 	var info_vbox = VBoxContainer.new()
 	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_vbox.add_theme_constant_override("separation", 4)
 	
 	# Count how many of this item we already own
 	var item_id = item_data.get("id", item_data.get("name", "unknown"))
@@ -103,6 +112,7 @@ func create_shop_item_display(item_data, current_glyphs):
 			if owned_id == item_id:
 				owned_count += 1
 	
+	# Item name with rarity color
 	var name_label = Label.new()
 	var item_name = item_data.get("name", "Unknown Item")
 	# Show owned count if any
@@ -110,37 +120,98 @@ func create_shop_item_display(item_data, current_glyphs):
 		name_label.text = item_name + " (Owned: " + str(owned_count) + ")"
 	else:
 		name_label.text = item_name
-	name_label.add_theme_font_size_override("font_size", 14)
+	name_label.add_theme_font_size_override("font_size", 16)
+	
+	# Apply rarity color
+	var rarity = item_data.get("rarity", "common")
+	name_label.modulate = get_rarity_color(rarity)
 	info_vbox.add_child(name_label)
 	
-	var desc_label = Label.new()
-	desc_label.text = item_data.get("description", "No description")
-	desc_label.add_theme_font_size_override("font_size", 10)
-	desc_label.modulate = Color(0.8, 0.8, 0.8)
-	info_vbox.add_child(desc_label)
+	# Piece type and item type
+	var piece_type = item_data.get("piece", "Unknown")
+	var type_text = get_type_display_text(item_type)
+	var meta_label = Label.new()
+	meta_label.text = "For: " + piece_type + " | Type: " + type_text
+	meta_label.add_theme_font_size_override("font_size", 11)
+	meta_label.modulate = Color(0.9, 0.9, 0.5)
+	info_vbox.add_child(meta_label)
+	
+	# Effect/Description
+	var effect_label = Label.new()
+	effect_label.text = item_data.get("effect", "No description")
+	effect_label.add_theme_font_size_override("font_size", 11)
+	effect_label.modulate = Color(0.85, 0.85, 0.85)
+	effect_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	effect_label.custom_minimum_size = Vector2(400, 0)
+	info_vbox.add_child(effect_label)
 	
 	container.add_child(info_vbox)
 	
+	# Right side container for price and button
+	var right_vbox = VBoxContainer.new()
+	right_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	right_vbox.add_theme_constant_override("separation", 8)
+	right_vbox.custom_minimum_size = Vector2(120, 0)
+	
 	# Price and buy button
-	var price = item_data.get("glyph_cost", 10)
+	var price = item_data.get("cost", item_data.get("glyph_cost", 10))
 	var price_label = Label.new()
 	price_label.text = str(price) + " Glyphs"
 	price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	price_label.custom_minimum_size = Vector2(80, 0)
-	container.add_child(price_label)
+	price_label.add_theme_font_size_override("font_size", 13)
+	right_vbox.add_child(price_label)
 	
 	var buy_button = Button.new()
 	buy_button.text = "Buy"
-	buy_button.custom_minimum_size = Vector2(60, 0)
+	buy_button.custom_minimum_size = Vector2(100, 35)
 	buy_button.disabled = current_glyphs < price
 	buy_button.pressed.connect(func(): _on_buy_item(item_data))
-	container.add_child(buy_button)
+	right_vbox.add_child(buy_button)
 	
-	return container
+	container.add_child(right_vbox)
+	center_container.add_child(container)
+	main_container.add_child(center_container)
+	
+	# Add separator line
+	var separator = HSeparator.new()
+	separator.modulate = Color(0.5, 0.5, 0.5, 0.5)
+	main_container.add_child(separator)
+	
+	return main_container
+
+func get_type_display_text(item_type: String) -> String:
+	"""Convert item type to display text"""
+	match item_type:
+		"permanent":
+			return "Permanent"
+		"run":
+			return "Run"
+		"level":
+			return "Level"
+		"use":
+			return "Active"
+		_:
+			return "Consumable"
+
+func get_rarity_color(rarity: String) -> Color:
+	"""Get color for item rarity"""
+	match rarity:
+		"common":
+			return Color.WHITE
+		"uncommon":
+			return Color(0.3, 1.0, 0.3)  # Green
+		"rare":
+			return Color(0.4, 0.6, 1.0)  # Blue
+		"epic":
+			return Color(0.8, 0.4, 1.0)  # Purple
+		"legendary":
+			return Color(1.0, 0.84, 0.0)  # Gold
+		_:
+			return Color.GRAY
 
 func _on_buy_item(item_data):
 	# Handle buying an item
-	var price = item_data.get("glyph_cost", 10)
+	var price = item_data.get("cost", item_data.get("glyph_cost", 10))
 	var current_glyphs = glyph_manager.get_current_glyphs()
 	
 	if current_glyphs >= price:

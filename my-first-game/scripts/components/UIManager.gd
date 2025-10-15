@@ -22,6 +22,9 @@ var game_over_overlay = null  # Store reference to game over screen
 var glyph_display = null  # Store reference to glyph display UI
 var shop_overlay = null  # Store reference to shop UI
 var loadout_overlay = null  # Store reference to loadout UI
+var event_feed = null  # Store reference to event feed UI
+var event_feed_items = []  # Store event feed entries
+const MAX_EVENT_FEED_ITEMS = 10  # Maximum number of events to show
 
 var parent_node = null
 var grid_system = null
@@ -156,6 +159,97 @@ func create_glyph_display():
 	
 	ui_node.add_child(glyph_display)
 	print("Added glyph display to UI node as Label")
+
+func create_event_feed():
+	"""Create the event feed UI for showing game events"""
+	print("UIManager.create_event_feed called")
+	
+	if not parent_node:
+		print("ERROR: parent_node is null!")
+		return
+	
+	# Find the UI node
+	var scene_root = parent_node.get_tree().current_scene
+	var ui_node = null
+	
+	if scene_root and scene_root.has_node("UI"):
+		ui_node = scene_root.get_node("UI")
+		print("Found UI node in scene")
+	elif parent_node.get_parent() and parent_node.get_parent().has_node("UI"):
+		ui_node = parent_node.get_parent().get_node("UI")
+		print("Found UI node in parent")
+	
+	if not ui_node:
+		print("WARNING: Could not find UI node for event feed")
+		return
+	
+	# Create the event feed container - positioned at bottom right
+	event_feed = VBoxContainer.new()
+	event_feed.name = "EventFeed"
+	# Anchor to bottom right
+	event_feed.anchor_left = 1.0
+	event_feed.anchor_top = 1.0
+	event_feed.anchor_right = 1.0
+	event_feed.anchor_bottom = 1.0
+	event_feed.offset_left = -360  # 360 pixels from right edge
+	event_feed.offset_top = -340   # 340 pixels from bottom edge
+	event_feed.offset_right = -10  # 10 pixels padding from right edge
+	event_feed.offset_bottom = -10 # 10 pixels padding from bottom edge
+	event_feed.add_theme_constant_override("separation", 2)
+	
+	# Add a background panel
+	var bg_panel = Panel.new()
+	bg_panel.position = Vector2(-5, -25)
+	bg_panel.size = Vector2(360, 340)
+	bg_panel.z_index = -1
+	bg_panel.modulate = Color(0, 0, 0, 0.7)
+	event_feed.add_child(bg_panel)
+	
+	# Add a title
+	var title_label = Label.new()
+	title_label.text = "⚔ Event Log ⚔"
+	title_label.add_theme_font_size_override("font_size", 14)
+	title_label.add_theme_color_override("font_color", Color.GOLD)
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	event_feed.add_child(title_label)
+	
+	# Add separator
+	var separator = HSeparator.new()
+	separator.modulate = Color.GOLD
+	event_feed.add_child(separator)
+	
+	ui_node.add_child(event_feed)
+	print("Added event feed to UI node at bottom right")
+
+func add_event_to_feed(message: String, color: Color = Color.WHITE):
+	"""Add a new event to the event feed"""
+	if not event_feed:
+		return
+	
+	# Create new event label
+	var event_label = Label.new()
+	event_label.text = "• " + message
+	event_label.add_theme_font_size_override("font_size", 11)
+	event_label.add_theme_color_override("font_color", color)
+	event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	event_label.custom_minimum_size = Vector2(340, 0)
+	
+	# Add to feed at the top (after title and separator)
+	if event_feed.get_child_count() >= 2:
+		event_feed.add_child(event_label)
+		event_feed.move_child(event_label, 2)  # Move to position 2 (after title and separator)
+	else:
+		event_feed.add_child(event_label)
+	
+	event_feed_items.append(event_label)
+	
+	# Remove oldest events if we exceed the limit
+	while event_feed_items.size() > MAX_EVENT_FEED_ITEMS:
+		var oldest = event_feed_items.pop_front()
+		if is_instance_valid(oldest):
+			oldest.queue_free()
+	
+	print("Added event to feed: ", message)
 
 func update_glyph_display(current_glyphs: int, stuck_glyphs: int = 0, stuck_level: int = 0):
 	"""Update the glyph display with current and stuck glyph counts"""
@@ -545,6 +639,9 @@ func apply_item_effects(piece_id: String, item_data: Dictionary):
 		print("Could not find piece node for ID: ", piece_id)
 		return
 	
+	# Add item use to event feed
+	show_item_use_event(piece_node.team, piece_node.piece_type, item_data.name)
+	
 	# Apply effects based on item type
 	var effect = item_data.get("effect", "").to_lower()
 	
@@ -583,26 +680,8 @@ func extract_number_from_string(text: String) -> int:
 
 func show_item_use_notification(grid_pos: Vector2, message: String):
 	"""Show a notification when an item is used"""
-	# Create a temporary label that fades out
-	var notification = Label.new()
-	notification.text = message
-	notification.add_theme_font_size_override("font_size", 14)
-	notification.add_theme_color_override("font_color", Color.GREEN)
-	
-	# Position it above the piece
-	if grid_system:
-		var world_pos = grid_system.grid_to_world_pos(grid_pos)
-		notification.position = world_pos + Vector2(0, -60)
-	
-	parent_node.add_child(notification)
-	
-	# Animate the notification
-	var tween = create_tween()
-	tween.parallel().tween_property(notification, "position", notification.position + Vector2(0, -30), 2.0)
-	tween.parallel().tween_property(notification, "modulate:a", 0.0, 2.0)
-	tween.tween_callback(func(): notification.queue_free())
-	
-	attack_ui.visible = true
+	# Add to event feed
+	add_event_to_feed(message, Color.LIGHT_GREEN)
 
 func hide_attack_ui():
 	"""Hide the attack UI"""
@@ -848,35 +927,63 @@ func create_attack_effect(grid_pos: Vector2):
 
 func show_attack_notification(attacker_team: String, attack_type: String, damage: int, target_pos: Vector2):
 	"""Show a notification when an attack happens"""
-	if not parent_node:
+	# Add to event feed instead of showing popup
+	var attacker_name = attacker_team.capitalize()
+	var attack_name = attack_type.capitalize()
+	var message = "%s used %s Attack (%d dmg)" % [attacker_name, attack_name, damage]
+	
+	var color = Color.CYAN if attacker_team == "player" else Color.ORANGE_RED
+	add_event_to_feed(message, color)
+
+func show_move_notification(piece_type: String, team: String, from_pos: Vector2, to_pos: Vector2):
+	"""Show a notification when a piece moves"""
+	var team_name = team.capitalize()
+	var piece_name = piece_type.capitalize()
+	var message = "%s %s moved to (%d, %d)" % [team_name, piece_name, int(to_pos.x), int(to_pos.y)]
+	
+	var color = Color(0.7, 0.9, 1.0) if team == "player" else Color(1.0, 0.7, 0.5)
+	add_event_to_feed(message, color)
+
+func show_defense_notification(defender_team: String, defender_type: String, damage_blocked: int):
+	"""Show a notification when a piece defends"""
+	if damage_blocked <= 0:
 		return
 	
-	# Create attack notification text
-	var notification = Label.new()
-	var attack_name = attack_type.capitalize()
-	notification.text = attacker_team.capitalize() + " " + attack_name + " Attack!\n" + str(damage) + " damage"
-	notification.size = Vector2(200, 60)
+	var team_name = defender_team.capitalize()
+	var piece_name = defender_type.capitalize()
+	var message = "%s %s defended (%d blocked)" % [team_name, piece_name, damage_blocked]
 	
-	# Position near the target
-	if grid_system:
-		var world_pos = grid_system.grid_to_world_pos(target_pos)
-		notification.position = world_pos + Vector2(-50, -80)  # Above the target
+	var color = Color.LIGHT_GREEN if defender_team == "player" else Color.YELLOW
+	add_event_to_feed(message, color)
+
+func show_item_use_event(team: String, piece_type: String, item_name: String):
+	"""Show a notification when an item is used"""
+	var team_name = team.capitalize()
+	var piece_name = piece_type.capitalize()
+	var message = "%s %s used %s" % [team_name, piece_name, item_name]
+	
+	var color = Color.LIGHT_GREEN
+	add_event_to_feed(message, color)
+
+func show_piece_death_event(team: String, piece_type: String, killed_by_team: String = ""):
+	"""Show a notification when a piece dies"""
+	var team_name = team.capitalize()
+	var piece_name = piece_type.capitalize()
+	var message = "%s %s was destroyed!" % [team_name, piece_name]
+	
+	var color = Color.RED if team == "player" else Color.ORANGE
+	add_event_to_feed(message, color)
+
+func show_glyph_reward_event(glyph_count: int, enemy_type: String):
+	"""Show a notification when glyphs are earned"""
+	var message = ""
+	if enemy_type == "king":
+		message = "KING DEFEATED! +%d Glyphs" % glyph_count
 	else:
-		notification.position = Vector2(400, 100)  # Fallback position
+		message = "Enemy defeated! +%d Glyphs" % glyph_count
 	
-	# Style the notification
-	notification.modulate = Color.YELLOW if attacker_team == "enemy" else Color.CYAN
-	notification.z_index = 5
-	notification.add_theme_font_size_override("font_size", 16)
-	
-	parent_node.add_child(notification)
-	
-	# Animate the notification
-	var tween = parent_node.create_tween()
-	tween.parallel().tween_property(notification, "position:y", notification.position.y - 30, 1.5)
-	# Fade out after 1.5 seconds
-	tween.parallel().tween_property(notification, "modulate:a", 0.0, 2.0).set_delay(1.0)
-	tween.tween_callback(notification.queue_free)
+	var color = Color.GOLD
+	add_event_to_feed(message, color)
 
 func update_ui_info(text: String):
 	"""Update the UI info text"""

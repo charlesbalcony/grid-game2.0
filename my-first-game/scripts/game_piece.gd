@@ -168,20 +168,12 @@ func show_damage_block_notification(blocked_amount: int):
 	if blocked_amount <= 0:
 		return
 	
-	# Create a damage block notification
-	var notification = Label.new()
-	notification.text = "-" + str(blocked_amount) + " blocked!"
-	notification.add_theme_font_size_override("font_size", 12)
-	notification.add_theme_color_override("font_color", Color.CYAN)
-	notification.position = Vector2(-30, -40)  # Above the piece
-	notification.z_index = 100
-	add_child(notification)
-	
-	# Animate the notification
-	var tween = create_tween()
-	tween.parallel().tween_property(notification, "position", Vector2(-30, -70), 1.5)
-	tween.parallel().tween_property(notification, "modulate:a", 0.0, 1.5)
-	tween.tween_callback(notification.queue_free)
+	# Add to event feed via UI manager (no more floating text)
+	var scene_root = get_tree().current_scene
+	if scene_root and scene_root.has_method("get_ui_manager"):
+		var ui_manager = scene_root.get_ui_manager()
+		if ui_manager:
+			ui_manager.show_defense_notification(team, piece_type, blocked_amount)
 
 func die():
 	is_alive = false

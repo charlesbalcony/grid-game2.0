@@ -202,6 +202,14 @@ func move_piece(from_pos: Vector2, to_pos: Vector2) -> bool:
 	pieces.erase(from_pos)
 	
 	print("Moved ", piece_node.piece_type, " from ", from_pos, " to ", to_pos)
+	
+	# Show move notification in event feed
+	var scene_root = get_tree().current_scene
+	if scene_root and scene_root.has_method("get_ui_manager"):
+		var ui_manager = scene_root.get_ui_manager()
+		if ui_manager:
+			ui_manager.show_move_notification(piece_node.piece_type, piece_node.team, from_pos, to_pos)
+	
 	piece_moved.emit(from_pos, to_pos)
 	return true
 
