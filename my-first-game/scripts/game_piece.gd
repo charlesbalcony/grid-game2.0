@@ -53,16 +53,88 @@ func _ready():
 	apply_equipped_item_effects()
 
 func setup_appearance():
-	# Set initial appearance based on team
+	"""Set up visual appearance - tries to load PNG texture first, falls back to colored rectangles"""
+	# Try to load texture from assets folder
+	var texture_path = "res://assets/%s_%s.png" % [piece_type, team]
+	var texture = load_texture_if_exists(texture_path)
+	
 	var sprite = $PieceSprite
 	var border = $Border
 	
-	if team == "player":
-		sprite.color = Color(0.1, 0.5, 0.9)  # Bright blue
-		border.color = Color(0.0, 0.2, 0.6)  # Dark blue border
+	if texture:
+		# Use texture - need to replace ColorRect with Sprite2D
+		print("✓ Loading texture for ", piece_type, " (", team, "): ", texture_path)
+		
+		# Check if we already converted to Sprite2D
+		if sprite and sprite is Sprite2D:
+			sprite.texture = texture
+			var tex_size = texture.get_size()
+			var scale_factor = 70.0 / max(tex_size.x, tex_size.y)
+			sprite.scale = Vector2(scale_factor, scale_factor)
+		elif sprite and sprite is ColorRect:
+			# Remove the ColorRect and create Sprite2D
+			var sprite_index = sprite.get_index()
+			sprite.queue_free()
+			
+			# Create new Sprite2D
+			var new_sprite = Sprite2D.new()
+			new_sprite.name = "PieceSprite"
+			new_sprite.texture = texture
+			new_sprite.centered = true
+			new_sprite.position = Vector2(0, 0)
+			
+			# Scale to fit approximately 70x70 pixels
+			var tex_size = texture.get_size()
+			var scale_factor = 70.0 / max(tex_size.x, tex_size.y)
+			new_sprite.scale = Vector2(scale_factor, scale_factor)
+			
+			add_child(new_sprite)
+			move_child(new_sprite, sprite_index)  # Keep same position in hierarchy
+		
+		# Hide border when using texture
+		if border:
+			border.visible = false
 	else:
-		sprite.color = Color(0.9, 0.2, 0.1)  # Bright red
-		border.color = Color(0.6, 0.0, 0.0)  # Dark red border
+		# Fall back to colored rectangles
+		print("✗ No texture found for ", piece_type, " (", team, "), using colored rectangle")
+		if sprite and sprite is ColorRect:
+			if team == "player":
+				sprite.color = Color(0.1, 0.5, 0.9)  # Bright blue
+				border.color = Color(0.0, 0.2, 0.6)  # Dark blue border
+			else:
+				sprite.color = Color(0.9, 0.2, 0.1)  # Bright red
+				border.color = Color(0.6, 0.0, 0.0)  # Dark red border
+
+func load_texture_if_exists(path: String) -> Texture2D:
+	"""Try to load a texture, return null if it doesn't exist"""
+	print("  Checking path: ", path)
+	
+	# First try the normal Godot resource loading (for imported assets)
+	if ResourceLoader.exists(path):
+		print("  ResourceLoader.exists(): true - loading via ResourceLoader")
+		var loaded = load(path)
+		print("  Loaded successfully: ", loaded != null)
+		return loaded
+	
+	# If not imported yet, try loading directly from file system
+	print("  ResourceLoader.exists(): false - trying direct file load")
+	var absolute_path = ProjectSettings.globalize_path(path)
+	print("  Absolute path: ", absolute_path)
+	
+	if FileAccess.file_exists(absolute_path):
+		print("  File exists! Loading as Image...")
+		var image = Image.new()
+		var error = image.load(absolute_path)
+		if error == OK:
+			print("  Image loaded successfully, creating texture...")
+			var texture = ImageTexture.create_from_image(image)
+			return texture
+		else:
+			print("  Failed to load image, error code: ", error)
+	else:
+		print("  File not found at absolute path")
+	
+	return null
 
 func create_health_bar():
 	# Create a health bar above the piece

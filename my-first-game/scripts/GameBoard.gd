@@ -41,11 +41,22 @@ var enemy_indicator = null
 var high_score_label = null
 var glyph_label = null
 var ai_timer = null  # Store AI timer to cancel if needed
+var loading_screen = null  # Loading overlay
 
 # Track current level in this run
 var current_level = 1
 
 func _ready():
+	# Check if there's a global loading screen from LoadoutMenu and keep it visible
+	var global_loading_layer = get_tree().root.get_node_or_null("GlobalLoadingScreen")
+	if global_loading_layer:
+		print("Found global loading screen from LoadoutMenu")
+		# Store reference so we can remove it later
+		loading_screen = global_loading_layer
+	else:
+		# Show our own loading screen if there isn't one already
+		show_loading_screen()
+	
 	# Enforce fullscreen mode for consistent UI layout
 	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -188,7 +199,7 @@ func _exit_tree():
 	if ui_manager:
 		ui_manager.clear_attack_highlights()
 		ui_manager.clear_drag_highlights()
-		ui_manager.clear_movement_highlights()
+		ui_manager.clear_hover_highlights()
 	
 	# Disconnect signals to prevent errors
 	if glyph_manager and is_instance_valid(glyph_manager):
@@ -314,6 +325,10 @@ func setup_board():
 	
 	# Apply battle start effects after initial piece setup
 	call_deferred("apply_battle_start_effects")
+	
+	# Hide loading screen after a short delay (let rendering catch up)
+	await get_tree().create_timer(0.1).timeout
+	hide_loading_screen()
 
 func _input(event):
 	# Let the InputHandler process input directly since it's in the scene tree
@@ -1017,3 +1032,56 @@ func _on_loadout_complete(screen_type: String):
 	elif screen_type == "level":
 		# Continue to next level after level loadout is complete
 		print("Level loadout complete - continuing to battle")
+
+func show_loading_screen():
+	"""Create and show a loading overlay"""
+	# Use CanvasLayer for proper fullscreen overlay
+	var canvas_layer = CanvasLayer.new()
+	canvas_layer.layer = 100  # Render on top of everything
+	
+	var screen = ColorRect.new()
+	screen.color = Color(0, 0, 0, 1.0)  # Solid black background
+	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	
+	# Add "Loading..." text
+	var label = Label.new()
+	label.text = "Loading..."
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	
+	# Style the text - large white text
+	label.add_theme_font_size_override("font_size", 64)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	
+	screen.add_child(label)
+	canvas_layer.add_child(screen)
+	add_child(canvas_layer)
+	
+	loading_screen = canvas_layer
+	print("Loading screen shown")
+
+func hide_loading_screen():
+	"""Fade out and remove the loading screen"""
+	if loading_screen:
+		print("Hiding loading screen...")
+		# Get the ColorRect child (which has the actual visuals)
+		var color_rect = null
+		if loading_screen.get_child_count() > 0:
+			color_rect = loading_screen.get_child(0)
+		
+		if color_rect:
+			# Create fade-out animation on the ColorRect
+			var tween = create_tween()
+			tween.tween_property(color_rect, "modulate:a", 0.0, 0.3)
+			tween.finished.connect(func():
+				if loading_screen:
+					loading_screen.queue_free()
+					loading_screen = null
+					print("Loading screen removed")
+			)
+		else:
+			# Fallback: just remove it immediately
+			loading_screen.queue_free()
+			loading_screen = null
+			print("Loading screen removed (no fade)")

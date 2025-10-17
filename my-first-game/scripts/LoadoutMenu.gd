@@ -398,6 +398,15 @@ func create_item_slot_section(piece_id: String, slot_info: Dictionary):
 			
 			var item_button = Button.new()
 			var display_name = item_id.replace("_", " ").capitalize()
+			
+			# Get full item data for tooltip
+			if data_loader:
+				var item_data = data_loader.get_item_by_id(item_id)
+				if item_data:
+					display_name = item_data.get("name", display_name)
+					# Set detailed tooltip
+					item_button.tooltip_text = create_item_tooltip(item_data)
+			
 			item_button.text = display_name
 			item_button.custom_minimum_size = Vector2(200, 35)
 			item_button.add_theme_font_size_override("font_size", 12)
@@ -510,6 +519,12 @@ func create_item_selection_dialog(piece_id: String, slot_type: String, available
 		item_button.custom_minimum_size = Vector2(250, 40)
 		item_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		item_button.add_theme_font_size_override("font_size", 12)
+		
+		# Add detailed tooltip
+		if data_loader:
+			var item_data = data_loader.get_item_by_id(item_id)
+			if item_data:
+				item_button.tooltip_text = create_item_tooltip(item_data)
 		
 		# Connect to equip this specific item
 		item_button.pressed.connect(func(): 
@@ -705,7 +720,10 @@ func populate_items_display():
 					count_text = " x" + str(item_info["count"])
 				item_label.text = "  • " + item_info["data"].get("name", item_id) + count_text
 				item_label.add_theme_font_size_override("font_size", 12)
-				item_label.tooltip_text = item_info["data"].get("description", "")
+				
+				# Set detailed tooltip
+				item_label.tooltip_text = create_item_tooltip(item_info["data"])
+				
 				items_container.add_child(item_label)
 		
 		# Spacer
@@ -762,11 +780,93 @@ func _on_back_to_menu_pressed():
 
 func _on_start_battle_button_pressed():
 	# Handle start battle button press
-	print("LoadoutMenu: Starting battle, returning to main game scene")
+	var start_time = Time.get_ticks_msec()
+	print("LoadoutMenu: [", start_time, "] Button pressed")
+	
+	# Disable the button to prevent double-clicks
+	if start_battle_button:
+		start_battle_button.disabled = true
+	
+	# Show loading screen immediately (add to root so it persists during scene change)
+	show_loading_screen()
+	print("LoadoutMenu: [", Time.get_ticks_msec() - start_time, "ms] Loading screen created")
+	
+	# Force multiple frame updates to ensure rendering happens
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("LoadoutMenu: [", Time.get_ticks_msec() - start_time, "ms] Frames processed")
+	
+	# Now do the heavy work
+	_do_save_and_transition(start_time)
+
+func _do_save_and_transition(start_time):
+	"""Perform the heavy save/transition work after loading screen is shown"""
 	# Save loadout data to GameState before starting battle
 	if loadout_manager:
 		GameState.piece_loadouts = loadout_manager.piece_loadouts.duplicate(true)
-		print("LoadoutMenu: Saved ", GameState.piece_loadouts.size(), " piece loadouts to GameState")
-	# Save before starting battle
+		print("LoadoutMenu: [", Time.get_ticks_msec() - start_time, "ms] Saved ", GameState.piece_loadouts.size(), " piece loadouts to GameState")
+	
+	# Save before starting battle (this is the slow part)
 	GameState.save_current()
+	print("LoadoutMenu: [", Time.get_ticks_msec() - start_time, "ms] Save complete")
+	
+	# Change scene
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+	print("LoadoutMenu: [", Time.get_ticks_msec() - start_time, "ms] Scene change initiated")
+
+func create_item_tooltip(item_data: Dictionary) -> String:
+	"""Create a formatted tooltip with item details"""
+	var tooltip = ""
+	
+	# Item name (bold if possible, otherwise just add)
+	tooltip += item_data.get("name", "Unknown Item") + "\n"
+	
+	# Item type and rarity
+	var item_type = item_data.get("type", "unknown").capitalize()
+	var rarity = item_data.get("rarity", "common").capitalize()
+	tooltip += "[" + item_type + " - " + rarity + "]\n\n"
+	
+	# Piece restriction
+	if item_data.has("piece"):
+		tooltip += "For: " + item_data.get("piece", "Any") + "\n\n"
+	
+	# Effect description
+	if item_data.has("effect"):
+		tooltip += item_data.get("effect", "") + "\n"
+	
+	# Fallback description if no effect
+	if not item_data.has("effect") and item_data.has("description"):
+		tooltip += item_data.get("description", "") + "\n"
+	
+	return tooltip
+
+func show_loading_screen():
+	"""Create and show a full-screen loading overlay that persists during scene change"""
+	# Use CanvasLayer for proper fullscreen overlay
+	var canvas_layer = CanvasLayer.new()
+	canvas_layer.name = "GlobalLoadingScreen"
+	canvas_layer.layer = 100  # Render on top of everything
+	
+	var loading_screen = ColorRect.new()
+	loading_screen.color = Color(0, 0, 0, 1.0)  # Solid black background
+	loading_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading_screen.mouse_filter = Control.MOUSE_FILTER_STOP  # Block all input
+	
+	# Add "Loading..." text
+	var label = Label.new()
+	label.text = "Loading..."
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	
+	# Style the text - large white text
+	label.add_theme_font_size_override("font_size", 64)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	
+	loading_screen.add_child(label)
+	canvas_layer.add_child(loading_screen)
+	
+	# Add to the ROOT of the scene tree so it persists during scene change
+	get_tree().root.add_child(canvas_layer)
+	
+	print("LoadoutMenu: Global loading screen shown")

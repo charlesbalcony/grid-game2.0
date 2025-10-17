@@ -97,8 +97,10 @@ func create_attack_ui():
 	
 	var panel = Panel.new()
 	panel.size = Vector2(300, 250)  # Made larger to accommodate item lists
-	# Center the panel on screen
-	panel.position = (Vector2(get_viewport().size) - panel.size) / 2  # Convert Vector2i to Vector2
+	# Center the panel on the game grid (roughly at 360, 360)
+	# Grid is 8x8 tiles at 80px each = 640x640, centered at screen center
+	var grid_center_y = 360  # Vertical center of the grid
+	panel.position = Vector2((get_viewport().size.x - panel.size.x) / 2, grid_center_y - panel.size.y / 2)
 	panel.add_theme_color_override("bg_color", Color(0.2, 0.2, 0.3, 0.9))
 	
 	var vbox = VBoxContainer.new()
@@ -939,7 +941,12 @@ func show_move_notification(piece_type: String, team: String, from_pos: Vector2,
 	"""Show a notification when a piece moves"""
 	var team_name = team.capitalize()
 	var piece_name = piece_type.capitalize()
-	var message = "%s %s moved to (%d, %d)" % [team_name, piece_name, int(to_pos.x), int(to_pos.y)]
+	
+	# Calculate distance moved
+	var distance = int(from_pos.distance_to(to_pos))
+	var spaces_text = "space" if distance == 1 else "spaces"
+	
+	var message = "%s %s moved %d %s" % [team_name, piece_name, distance, spaces_text]
 	
 	var color = Color(0.7, 0.9, 1.0) if team == "player" else Color(1.0, 0.7, 0.5)
 	add_event_to_feed(message, color)
