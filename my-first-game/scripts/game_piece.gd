@@ -15,6 +15,9 @@ var grid_position: Vector2
 var is_selected: bool = false
 var is_alive: bool = true
 
+# Animation control
+var breathing_tween: Tween = null
+
 # Attack cooldown tracking (attack_name -> turns_remaining)
 var attack_cooldowns: Dictionary = {}
 
@@ -43,8 +46,11 @@ func _ready():
 	base_max_health = max_health
 	
 	current_health = max_health
-	setup_appearance()
+	await setup_appearance()  # Wait for appearance setup to complete
 	create_health_bar()
+	
+	# Start breathing animation after appearance is fully set up
+	start_breathing_animation()
 	
 	# Apply item effects after setup - try multiple times to ensure it works
 	call_deferred("apply_equipped_item_effects")
@@ -74,7 +80,8 @@ func setup_appearance():
 		elif sprite and sprite is ColorRect:
 			# Remove the ColorRect and create Sprite2D
 			var sprite_index = sprite.get_index()
-			sprite.queue_free()
+			remove_child(sprite)  # Remove immediately instead of queue_free
+			sprite.queue_free()   # Still queue for deletion
 			
 			# Create new Sprite2D
 			var new_sprite = Sprite2D.new()
@@ -90,6 +97,9 @@ func setup_appearance():
 			
 			add_child(new_sprite)
 			move_child(new_sprite, sprite_index)  # Keep same position in hierarchy
+			
+			# Wait for next frame to ensure new sprite is fully ready in the scene tree
+			await get_tree().process_frame
 		
 		# Hide border when using texture
 		if border:
@@ -113,11 +123,14 @@ func load_texture_if_exists(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
 		print("  ResourceLoader.exists(): true - loading via ResourceLoader")
 		var loaded = load(path)
-		print("  Loaded successfully: ", loaded != null)
-		return loaded
+		if loaded != null:
+			print("  Loaded successfully via ResourceLoader")
+			return loaded
+		else:
+			print("  ResourceLoader failed, trying direct file load...")
 	
-	# If not imported yet, try loading directly from file system
-	print("  ResourceLoader.exists(): false - trying direct file load")
+	# If not imported or ResourceLoader failed, try loading directly from file system
+	print("  Trying direct file load")
 	var absolute_path = ProjectSettings.globalize_path(path)
 	print("  Absolute path: ", absolute_path)
 	
@@ -152,30 +165,6 @@ func create_health_bar():
 	health_bar.name = "HealthBar"
 	add_child(health_bar)
 	
-	# Add team indicator
-	var team_indicator = Label.new()
-	team_indicator.position = Vector2(-15, -65)
-	team_indicator.size = Vector2(30, 15)
-	team_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	team_indicator.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	team_indicator.add_theme_font_size_override("font_size", 10)
-	
-	if team == "player":
-		if piece_type == "king":
-			team_indicator.text = "K"
-		else:
-			team_indicator.text = "P"
-		team_indicator.add_theme_color_override("font_color", Color.BLACK)
-	else:
-		if piece_type == "king":
-			team_indicator.text = "K"
-		else:
-			team_indicator.text = "E"
-		team_indicator.add_theme_color_override("font_color", Color.BLACK)
-	
-	team_indicator.name = "TeamIndicator"
-	add_child(team_indicator)
-	
 	update_health_bar()
 
 func update_health_bar():
@@ -192,15 +181,112 @@ func update_health_bar():
 		else:
 			health_bar.color = Color(0.8, 0.0, 0.0)  # Red
 
+func start_breathing_animation():
+	"""Create a subtle breathing/pulsing animation for the piece"""
+	var sprite = get_node_or_null("PieceSprite")
+	if not sprite:
+		print("Warning: PieceSprite not found for breathing animation")
+		return
+	
+	# Verify the sprite is still valid and in the tree
+	if not is_instance_valid(sprite) or not sprite.is_inside_tree():
+		print("Warning: PieceSprite not valid or not in tree")
+		return
+	
+	# Stop any existing breathing animation
+	if breathing_tween:
+		breathing_tween.kill()
+	
+	# Create a new tween for smooth breathing effect
+	breathing_tween = create_tween()
+	breathing_tween.set_loops()  # Loop infinitely
+	
+	# Get the current scale as the base
+	var base_scale = sprite.scale
+	var breathe_scale = base_scale * 1.03  # Scale up by 3% for a subtle pulse
+	
+	# Breathing cycle: expand -> contract with faster speed
+	# Each team gets slightly different timing for variety
+	var breathe_speed = 0.8 if team == "player" else 0.9
+	
+	breathing_tween.tween_property(sprite, "scale", breathe_scale, breathe_speed).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	breathing_tween.tween_property(sprite, "scale", base_scale, breathe_speed).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func stop_breathing_animation():
+	"""Stop the breathing animation (useful for death or special states)"""
+	if breathing_tween:
+		breathing_tween.kill()
+		breathing_tween = null
+
+func flash_damage():
+	"""Flash the piece red briefly when taking damage"""
+	var sprite = get_node_or_null("PieceSprite")
+	if not sprite:
+		return
+	
+	# Play damage sound effect
+	play_damage_sound()
+	
+	# Create a quick flash tween
+	var flash_tween = create_tween()
+	
+	# Flash red, then back to normal
+	flash_tween.tween_property(sprite, "modulate", Color(2.0, 0.5, 0.5), 0.1)  # Bright red
+	flash_tween.tween_property(sprite, "modulate", Color.WHITE, 0.15)  # Back to normal
+
+func play_damage_sound():
+	"""Play the damage/hit sound effect"""
+	var sound_path = "res://audio/sfx/sword_hit.ogg"
+	var sound_player = AudioStreamPlayer.new()
+	
+	# Try ResourceLoader first (for imported files)
+	if ResourceLoader.exists(sound_path):
+		var sound = load(sound_path)
+		sound_player.stream = sound
+		sound_player.volume_db = -5
+		add_child(sound_player)
+		sound_player.play()
+		sound_player.finished.connect(sound_player.queue_free)
+		print("✓ Playing damage sound (imported)")
+	else:
+		# Try direct file loading using AudioStreamOggVorbis
+		var absolute_path = ProjectSettings.globalize_path(sound_path)
+		if FileAccess.file_exists(absolute_path):
+			var audio_file = AudioStreamOggVorbis.load_from_file(absolute_path)
+			if audio_file:
+				sound_player.stream = audio_file
+				sound_player.volume_db = -5
+				add_child(sound_player)
+				sound_player.play()
+				sound_player.finished.connect(sound_player.queue_free)
+				print("✓ Playing damage sound (direct load)")
+			else:
+				print("✗ Failed to load OGG file")
+		else:
+			print("✗ Sound file not found at: ", absolute_path)
+
 func set_grid_position(pos: Vector2):
 	grid_position = pos
 
 func set_selected(selected: bool):
 	is_selected = selected
+	var sprite = get_node_or_null("PieceSprite")
+	var border = get_node_or_null("Border")
+	
 	if selected:
-		$PieceSprite.color = $PieceSprite.color.lightened(0.4)
-		$Border.color = Color.WHITE  # White border when selected
+		# Handle both ColorRect and Sprite2D
+		if sprite:
+			if sprite is ColorRect:
+				sprite.color = sprite.color.lightened(0.4)
+			elif sprite is Sprite2D:
+				sprite.modulate = Color(1.4, 1.4, 1.4)  # Brighten the sprite
+		if border:
+			border.color = Color.WHITE  # White border when selected
 	else:
+		# Reset to normal appearance
+		if sprite:
+			if sprite is Sprite2D:
+				sprite.modulate = Color.WHITE  # Reset modulation
 		setup_appearance()
 
 func set_piece_type_data(type_data):
@@ -218,6 +304,9 @@ func take_damage(damage: int):
 	
 	current_health -= actual_damage
 	current_health = max(0, current_health)
+	
+	# Flash red to show damage
+	flash_damage()
 	
 	update_health_bar()
 	piece_damaged.emit(self, actual_damage)
@@ -249,6 +338,10 @@ func show_damage_block_notification(blocked_amount: int):
 
 func die():
 	is_alive = false
+	
+	# Stop breathing animation when dying
+	stop_breathing_animation()
+	
 	piece_died.emit(self)
 	
 	# Visual feedback for death

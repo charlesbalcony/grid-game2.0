@@ -104,12 +104,16 @@ func equip_item(instance_id: String, item_id: String, slot_type: String) -> bool
 	
 	# For permanent, run, and level slots, only allow one item
 	if slot_type in ["permanent", "run", "level"]:
-		if loadout[slot_type].size() > 0:
+		# Safely check if there's an existing item and unequip it
+		if not loadout[slot_type].is_empty() and loadout[slot_type].size() > 0:
 			# Unequip existing item (return to available pool)
 			var old_item = loadout[slot_type][0]
 			loadout[slot_type].clear()
 			available_items.append(old_item)
 			item_unequipped.emit(loadout.piece_type, old_item, slot_type)
+		else:
+			# Just to be extra safe, clear any potentially corrupted state
+			loadout[slot_type].clear()
 		loadout[slot_type].append(item_id)
 	else:
 		# Use items can stack

@@ -69,10 +69,14 @@ func set_input_enabled(enabled: bool):
 	else:
 		print("InputHandler: Input DISABLED")
 		# Clear any ongoing interactions when disabling
+		is_dragging = false
 		if piece_manager:
 			piece_manager.clear_selection()
 		if ui_manager:
 			ui_manager.clear_attack_ui()
+			ui_manager.clear_attack_highlights()
+			ui_manager.clear_drag_highlights()
+			ui_manager.clear_hover_highlights()
 		set_mode("MOVE")
 
 func _ready():
@@ -431,7 +435,10 @@ func set_mode(new_mode: String):
 		current_mode = new_mode
 		
 		if ui_manager:
+			# Clear all highlights when switching modes
 			ui_manager.clear_attack_highlights()
+			ui_manager.clear_drag_highlights()
+			ui_manager.clear_hover_highlights()
 			
 			if new_mode == "MOVE":
 				ui_manager.hide_attack_ui()

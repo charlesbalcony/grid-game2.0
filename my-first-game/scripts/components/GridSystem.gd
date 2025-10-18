@@ -116,9 +116,12 @@ func load_texture_if_exists(path: String) -> Texture2D:
 	"""Try to load a texture, return null if it doesn't exist"""
 	# First try the normal Godot resource loading (for imported assets)
 	if ResourceLoader.exists(path):
-		return load(path)
+		var loaded = load(path)
+		if loaded != null:
+			return loaded
+		# If ResourceLoader failed, fall through to direct loading
 	
-	# If not imported yet, try loading directly from file system
+	# If not imported or ResourceLoader failed, try loading directly from file system
 	var absolute_path = ProjectSettings.globalize_path(path)
 	if FileAccess.file_exists(absolute_path):
 		var image = Image.new()

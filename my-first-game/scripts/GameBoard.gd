@@ -77,6 +77,9 @@ func _ready():
 	# Initialize components
 	initialize_components()
 
+	# Set up background music
+	setup_background_music()
+
 	# Initialize glyph manager
 	glyph_manager = GlyphManager.new()
 	add_child(glyph_manager)
@@ -272,6 +275,44 @@ func initialize_components():
 	
 	# Setup UI manager connections now that all managers are initialized
 	setup_ui_manager_connections()
+
+func setup_background_music():
+	"""Set up and play background music"""
+	var music_player = AudioStreamPlayer.new()
+	music_player.name = "BackgroundMusic"
+	
+	# Load the music file
+	var music_path = "res://audio/music/battle_music.ogg"
+	if ResourceLoader.exists(music_path):
+		var music = load(music_path)
+		if music:
+			music_player.stream = music
+			music_player.volume_db = -10
+			music_player.autoplay = true
+			music_player.bus = "Master"
+			add_child(music_player)
+			music_player.play()
+			print("✓ Background music started (imported): ", music_path)
+		else:
+			print("✗ Failed to load via ResourceLoader, trying direct load...")
+	
+	# Try direct loading if ResourceLoader failed or doesn't exist
+	if not music_player.stream:
+		var absolute_path = ProjectSettings.globalize_path(music_path)
+		if FileAccess.file_exists(absolute_path):
+			print("  File exists on disk, loading directly...")
+			var audio_file = AudioStreamOggVorbis.load_from_file(absolute_path)
+			if audio_file:
+				audio_file.loop = true  # Enable looping for OGG files
+				music_player.stream = audio_file
+				music_player.volume_db = -10
+				add_child(music_player)
+				music_player.play()
+				print("✓ Background music started (direct load)")
+			else:
+				print("✗ Failed to load music directly")
+		else:
+			print("✗ Music file not found at: ", absolute_path)
 
 func setup_ui_manager_connections():
 	"""Setup UI manager connections after all managers are initialized"""
